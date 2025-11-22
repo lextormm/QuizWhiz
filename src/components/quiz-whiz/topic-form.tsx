@@ -55,6 +55,7 @@ export default function TopicForm({ onStartQuiz }: TopicFormProps) {
                 <SelectItem value="3">3 Questions</SelectItem>
                 <SelectItem value="5">5 Questions</SelectItem>
                 <SelectItem value="10">10 Questions</SelectItem>
+                <SelectItem value="20">20 Questions</SelectItem>
               </SelectContent>
             </Select>
           </div>
