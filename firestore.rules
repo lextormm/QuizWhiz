@@ -1,0 +1,178 @@
+/**
+ * This Firestore Security Ruleset is designed for the QuizWhiz application,
+ * which serves two primary user roles: Students and Professors. The rules
+ * enforce a security model that balances student data privacy with the
+ * professor's need to monitor academic progress.
+ *
+ * Core Philosophy:
+ * The security model is based on a strict separation of roles and data ownership.
+ * Student data is private and owned by the student, but is made visible (read-only)
+ * to users identified as professors. Public content, like quizzes, is readable by all
+ * authenticated users but writable only by professors.
+ *
+ * Data Structure:
+ * - /students/{studentId}/...: All data private to a specific student, including their
+ *   profile, quiz attempts, and answers, is nested under their unique user ID. This
+ *   path-based ownership is the primary mechanism for securing student data.
+ * - /professors/{professorId}: Professor profiles are stored separately to enforce
+ *   strict self-ownership.
+ * - /quizzes/{quizId}/...: All general quiz and question content is stored in a top-level
+ *   public collection, segregated from user-specific data.
+ *
+ * Key Security Decisions:
+ * - Professor Access: A professor's ability to view all student data is managed
+ *   via a custom authentication token claim (`isProfessor: true`). This is a highly
+ *   performant and secure method for role-based access control, avoiding costly
+ *   database reads within the rules. Professors are granted READ-ONLY access to
+ *   student data to prevent accidental or malicious modification of student records.
+ * - Quiz Management: The creation and management of quizzes and questions are
+ *   restricted to professors to ensure content integrity.
+ * - Default Deny: The ruleset follows a default-deny posture. Access is only granted
+ *   explicitly. All write operations require authentication and authorization.
+ *
+ * Denormalization for Authorization:
+ * This ruleset assumes that a custom claim `isProfessor` is set on a user's
+ * authentication token by a trusted backend (e.g., Cloud Functions) using the Firebase
+ * Admin SDK. This avoids slow and costly `get()` calls to a separate 'roles'
+ * collection. For student-owned documents like `quiz_attempts`, a `studentId` field
+ * is expected to be on the document itself to validate and enforce the ownership
+ * relationship on creation and prevent it from being changed on update.
+ *
+ * Structural Segregation:
+ * The separation of `/students`, `/professors`, and `/quizzes` into distinct top-level
+ * collections is a key design choice. This ensures that permissions are homogenous
+ * within a collection, making list queries both secure and efficient. For example, a
+ * student can safely list their own quiz attempts without any risk of retrieving
+ * another student's data.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for reusable logic
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided document owner's UID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    /**
+     * Checks if the authenticated user is the owner of an existing document.
+     * Crucial for preventing modification of non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Checks if the user has the 'professor' custom claim.
+     * This claim MUST be set on the user's auth token by a trusted backend server.
+     * Example: admin.auth().setCustomUserClaims(uid, { isProfessor: true });
+     */
+    function isProfessor() {
+      return isSignedIn() && request.auth.token.isProfessor == true;
+    }
+    
+    /**
+     * Determines if a user can read a student's data. Access is granted if the user
+     * is the student themselves or if the user is a professor.
+     */
+    function canReadStudentData(studentId) {
+      return isOwner(studentId) || isProfessor();
+    }
+
+    /**
+     * @description Manages student profile documents.
+     * @path /students/{studentId}
+     * @allow A student (uid: 'user123') creates their own profile document at /students/user123. (create)
+     * @allow A professor reads the student profile at /students/user123. (get)
+     * @deny A different student (uid: 'user456') tries to read or write the profile at /students/user123. (get/update)
+     * @principle Enforces self-creation and ownership, with a role-based override for professor read access.
+     */
+    match /students/{studentId} {
+      allow get, list: if canReadStudentData(studentId);
+      allow create: if isOwner(studentId) && request.resource.data.id == studentId;
+      allow update: if isExistingOwner(studentId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(studentId);
+
+      /**
+       * @description Manages a student's individual quiz attempts.
+       * @path /students/{studentId}/quiz_attempts/{quizAttemptId}
+       * @allow The student 'user123' creates a new quiz attempt for themselves. (create)
+       * @allow A professor reads the list of quiz attempts for student 'user123'. (list)
+       * @deny Student 'user456' tries to update an attempt belonging to student 'user123'. (update)
+       * @principle Subcollection ownership, ensuring data is nested under the correct owner.
+       */
+      match /quiz_attempts/{quizAttemptId} {
+        allow get, list: if canReadStudentData(studentId);
+        allow create: if isOwner(studentId) && request.resource.data.studentId == studentId;
+        allow update: if isExistingOwner(studentId) && request.resource.data.studentId == resource.data.studentId;
+        allow delete: if isExistingOwner(studentId);
+
+        /**
+         * @description Manages the answers for a specific quiz attempt.
+         * @path /students/{studentId}/quiz_attempts/{quizAttemptId}/answers/{answerId}
+         * @allow Student 'user123' creates an answer for their own quiz attempt. (create)
+         * @allow A professor reads an answer submitted by student 'user123'. (get)
+         * @deny Student 'user456' tries to delete an answer belonging to student 'user123'. (delete)
+         * @principle Deep subcollection ownership, inheriting permissions from the parent path.
+         */
+        match /answers/{answerId} {
+          allow get, list: if canReadStudentData(studentId);
+          allow create: if isOwner(studentId) && request.resource.data.quizAttemptId == quizAttemptId;
+          allow update: if isExistingOwner(studentId);
+          allow delete: if isExistingOwner(studentId);
+        }
+      }
+    }
+
+    /**
+     * @description Manages professor profile documents.
+     * @path /professors/{professorId}
+     * @allow A professor (uid: 'profABC') creates their own profile at /professors/profABC. (create)
+     * @deny Any other user, including other professors or students, tries to read or write this profile. (get/update/delete)
+     * @principle Enforces strict document ownership. Only the user themselves can access their own data.
+     */
+    match /professors/{professorId} {
+      allow get, list: if isOwner(professorId);
+      allow create: if isOwner(professorId) && request.resource.data.id == professorId;
+      allow update: if isExistingOwner(professorId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(professorId);
+    }
+
+    /**
+     * @description Manages quiz documents, which are readable by all but only managed by professors.
+     * @path /quizzes/{quizId}
+     * @allow Any authenticated student or professor can read a quiz. (get)
+     * @deny A student attempts to create a new quiz. (create)
+     * @principle Implements a public-read, role-restricted write access pattern.
+     */
+    match /quizzes/{quizId} {
+      allow get, list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Quiz' entity is missing an 'ownerId' or 'authorId' field.
+      // This field is required to verify that the professor creating or modifying the quiz is the original author.
+      allow create, update, delete: if false; // TODO: Add professor-as-owner validation once the schema is updated with an ownership field (e.g., `authorId`).
+      
+      /**
+       * @description Manages the questions within a quiz.
+       * @path /quizzes/{quizId}/questions/{questionId}
+       * @allow Any authenticated student or professor can read the questions of a quiz. (list)
+       * @deny A student attempts to add a new question to a quiz. (create)
+       * @principle Inherits the public-read, role-restricted write pattern from its parent collection.
+       */
+      match /questions/{questionId} {
+        allow get, list: if isSignedIn();
+        // CRITICAL: Cannot implement owner-only writes. The 'Question' entity is missing an 'ownerId' or 'authorId' field.
+        allow create, update, delete: if false; // TODO: Add professor-as-owner validation once the schema is updated with an ownership field.
+      }
+    }
+  }
+}

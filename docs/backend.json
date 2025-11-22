@@ -1,0 +1,317 @@
+{
+  "entities": {
+    "Student": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Student",
+      "type": "object",
+      "description": "Represents a student in the QuizWhiz application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Student entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the student."
+        },
+        "quizAttemptIds": {
+          "type": "array",
+          "description": "References to QuizAttempt entities for this student. (Relationship: Student 1:N QuizAttempt)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Professor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Professor",
+      "type": "object",
+      "description": "Represents a professor in the QuizWhiz application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Professor entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the professor."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Quiz": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Quiz",
+      "type": "object",
+      "description": "Represents a quiz with multiple questions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Quiz entity."
+        },
+        "topic": {
+          "type": "string",
+          "description": "The topic of the quiz."
+        },
+        "questionIds": {
+          "type": "array",
+          "description": "References to Question entities in this quiz. (Relationship: Quiz 1:N Question)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "topic"
+      ]
+    },
+    "Question": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Question",
+      "type": "object",
+      "description": "Represents a question in a quiz.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Question entity."
+        },
+        "quizId": {
+          "type": "string",
+          "description": "Reference to the Quiz this question belongs to. (Relationship: Quiz 1:N Question)"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text of the question."
+        },
+        "answerOptions": {
+          "type": "array",
+          "description": "The possible answer options for the question.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "correctAnswerIndex": {
+          "type": "number",
+          "description": "The index of the correct answer in the answerOptions array."
+        }
+      },
+      "required": [
+        "id",
+        "quizId",
+        "text",
+        "answerOptions",
+        "correctAnswerIndex"
+      ]
+    },
+    "QuizAttempt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "QuizAttempt",
+      "type": "object",
+      "description": "Represents a student's attempt to take a quiz.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the QuizAttempt entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to the Student who took the quiz. (Relationship: Student 1:N QuizAttempt)"
+        },
+        "quizId": {
+          "type": "string",
+          "description": "Reference to the Quiz being attempted. (Relationship: Quiz 1:N QuizAttempt)"
+        },
+        "score": {
+          "type": "number",
+          "description": "The student's score on the quiz attempt."
+        },
+        "submissionDateTime": {
+          "type": "string",
+          "description": "The date and time the quiz was submitted.",
+          "format": "date-time"
+        },
+        "answerIds": {
+          "type": "array",
+          "description": "References to Answer entities for this quiz attempt. (Relationship: QuizAttempt 1:N Answer)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "quizId",
+        "score",
+        "submissionDateTime"
+      ]
+    },
+    "Answer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Answer",
+      "type": "object",
+      "description": "Represents a student's answer to a specific question in a quiz attempt.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Answer entity."
+        },
+        "quizAttemptId": {
+          "type": "string",
+          "description": "Reference to the QuizAttempt this answer belongs to. (Relationship: QuizAttempt 1:N Answer)"
+        },
+        "questionId": {
+          "type": "string",
+          "description": "Reference to the Question being answered."
+        },
+        "selectedAnswerIndex": {
+          "type": "number",
+          "description": "The index of the answer option selected by the student."
+        },
+        "isCorrect": {
+          "type": "boolean",
+          "description": "Indicates whether the answer is correct."
+        }
+      },
+      "required": [
+        "id",
+        "quizAttemptId",
+        "questionId",
+        "selectedAnswerIndex",
+        "isCorrect"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/students/{studentId}",
+        "definition": {
+          "entityName": "Student",
+          "schema": {
+            "$ref": "#/backend/entities/Student"
+          },
+          "description": "Stores student profiles. Only the student and professor can read or write this data.",
+          "params": [
+            {
+              "name": "studentId",
+              "description": "The unique identifier of the student."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/professors/{professorId}",
+        "definition": {
+          "entityName": "Professor",
+          "schema": {
+            "$ref": "#/backend/entities/Professor"
+          },
+          "description": "Stores professor profiles. Only the professor can read or write this data.",
+          "params": [
+            {
+              "name": "professorId",
+              "description": "The unique identifier of the professor."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/quizzes/{quizId}",
+        "definition": {
+          "entityName": "Quiz",
+          "schema": {
+            "$ref": "#/backend/entities/Quiz"
+          },
+          "description": "Stores general quiz information, accessible to all students and professors.",
+          "params": [
+            {
+              "name": "quizId",
+              "description": "The unique identifier of the quiz."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/quizzes/{quizId}/questions/{questionId}",
+        "definition": {
+          "entityName": "Question",
+          "schema": {
+            "$ref": "#/backend/entities/Question"
+          },
+          "description": "Stores the questions for each quiz. Accessible to all students and professors.",
+          "params": [
+            {
+              "name": "quizId",
+              "description": "The unique identifier of the quiz."
+            },
+            {
+              "name": "questionId",
+              "description": "The unique identifier of the question."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/students/{studentId}/quiz_attempts/{quizAttemptId}",
+        "definition": {
+          "entityName": "QuizAttempt",
+          "schema": {
+            "$ref": "#/backend/entities/QuizAttempt"
+          },
+          "description": "Stores quiz attempts for a specific student. Accessible only to the student and the professor.",
+          "params": [
+            {
+              "name": "studentId",
+              "description": "The unique identifier of the student."
+            },
+            {
+              "name": "quizAttemptId",
+              "description": "The unique identifier of the quiz attempt."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/students/{studentId}/quiz_attempts/{quizAttemptId}/answers/{answerId}",
+        "definition": {
+          "entityName": "Answer",
+          "schema": {
+            "$ref": "#/backend/entities/Answer"
+          },
+          "description": "Stores answers for a specific quiz attempt. Accessible only to the student and professor.",
+          "params": [
+            {
+              "name": "studentId",
+              "description": "The unique identifier of the student."
+            },
+            {
+              "name": "quizAttemptId",
+              "description": "The unique identifier of the quiz attempt."
+            },
+            {
+              "name": "answerId",
+              "description": "The unique identifier of the answer."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to securely manage quiz data for students and professors. It leverages path-based ownership for student-specific data and segregated collections for professor-specific data and general quiz information. Authorization Independence is achieved by storing student and professor data separately. All paths use semantic names. Segregation ensures QAPs are met, as listing operations are always scoped to collections with homogenous security needs.\n\nSpecifically, `users/{userId}/quiz_attempts/{quizAttemptId}` stores student-created quiz attempts. This enforces that only the user can access and modify their own quiz attempts through rules. Professors are stored separately in `/professors/{professorId}` for professor-specific information. Quiz data is stored in `/quizzes/{quizId}` and questions in `/quizzes/{quizId}/questions/{questionId}`. This structure enables professor to be able to see the progress of all students and to be able to see the overall class data. The separation ensures data is not mixed in collections."
+  }
+}
