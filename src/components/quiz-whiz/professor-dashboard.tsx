@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
 import { format } from 'date-fns';
+import { useMemo } from "react";
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
   return (
@@ -28,13 +29,10 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
 export default function ProfessorDashboard() {
   const { auth, firestore, user } = useFirebase();
 
-  // Only run the query if we have a firestore instance and the user is a professor
-  const isProfessor = user?.displayName === 'Professor';
-
   const attemptsQuery = useMemoFirebase(() => {
-    if (!firestore || !isProfessor) return null;
+    if (!firestore) return null;
     return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
-  }, [firestore, isProfessor]);
+  }, [firestore]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
