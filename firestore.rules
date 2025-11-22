@@ -12,41 +12,39 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Custom claims can be set via a backend function to assign roles.
-    // For simplicity, we'll check a 'role' field in a user's profile document.
     function isProfessor() {
-      // Assumes a /users/{userId} document exists with a 'role' field.
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor';
+    }
+    
+    function isStudent() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
 
     // /users/{userId}
-    // Users can read/update their own profile.
-    // Users can create their own profile if the document userId matches their auth uid.
+    // Users can read their own profile.
+    // Users can create their own profile.
     match /users/{userId} {
-      allow read, update: if isOwner(userId);
+      allow read: if isOwner(userId);
       allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
     }
 
     // /quizzes/{quizId}
     // Any signed-in user can read quizzes.
     // Only professors can create, update, or delete quizzes.
-    // The authorId of the quiz must match the creator's UID.
     match /quizzes/{quizId} {
       allow read: if isSignedIn();
-      allow create: if isProfessor() && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if isProfessor() && resource.data.authorId == request.auth.uid;
+      allow create, update, delete: if isProfessor() && request.resource.data.authorId == request.auth.uid;
     }
 
     // /quizAttempts/{attemptId}
-    // Students can create their own quiz attempts.
-    // Students can read their own individual quiz attempts.
+    // Students can create their own quiz attempts and read their own individual attempts.
     // Professors can read all quiz attempts.
-    // Students can list/query for their own attempts, professors for all.
     match /quizAttempts/{attemptId} {
       allow get: if isOwner(resource.data.studentId) || isProfessor();
-      allow list: if isProfessor() || (isSignedIn() && request.query.where.studentId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.studentId);
-      // Students cannot update or delete their past attempts.
+      allow list: if isProfessor() || (isStudent() && request.query.where[0][2] == request.auth.uid);
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      // Nobody can update or delete past attempts.
       allow update, delete: if false;
     }
   }
