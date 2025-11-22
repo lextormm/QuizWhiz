@@ -20,11 +20,11 @@ service cloud.firestore {
     }
 
     // /users/{userId}
-    // Users can create their own profile.
-    // Users can only read/update/delete their own profile.
+    // Users can read/update their own profile.
+    // Users can create their own profile if the document userId matches their auth uid.
     match /users/{userId} {
-      allow read, update, delete: if isOwner(userId);
-      allow create: if isSignedIn() && request.resource.data.id == request.auth.uid;
+      allow read, update: if isOwner(userId);
+      allow create: if isOwner(userId);
     }
 
     // /quizzes/{quizId}
