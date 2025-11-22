@@ -29,7 +29,7 @@ export default function TopicForm({ onStartQuiz }: TopicFormProps) {
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
           <BookOpen className="h-8 w-8 text-accent-foreground" />
         </div>
-        <CardTitle className="font-headline text-3xl">Create Your Quiz</CardTitle>
+        <CardTitle className="font-headline text-3xl">Create a Quiz</CardTitle>
         <CardDescription>Enter any topic and we'll generate a quiz for you!</CardDescription>
       </CardHeader>
       <CardContent>

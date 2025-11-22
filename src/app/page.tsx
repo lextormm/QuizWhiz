@@ -1,27 +1,48 @@
 "use client";
 
+import { useUser, FirebaseClientProvider } from "@/firebase";
 import { Logo } from "@/components/quiz-whiz/logo";
 import dynamic from 'next/dynamic';
 import { Loader2 } from "lucide-react";
+import Login from "@/components/quiz-whiz/login";
+import ProfessorDashboard from "@/components/quiz-whiz/professor-dashboard";
+import StudentView from "@/components/quiz-whiz/student-view";
 
-const QuizWhizApp = dynamic(() => import('@/components/quiz-whiz/quiz-whiz-app'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <p className="text-lg font-medium">Loading QuizWhiz...</p>
-    </div>
-  ),
-});
+const AppContent = () => {
+  const { user, isUserLoading } = useUser();
+
+  if (isUserLoading) {
+    return (
+      <div className="flex flex-col items-center gap-4 text-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-lg font-medium">Authenticating...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  // A simple way to distinguish between professor and student
+  // In a real app, this would be based on custom claims or roles in the database
+  if (user.displayName === 'Professor') {
+    return <ProfessorDashboard />;
+  }
+
+  return <StudentView />;
+};
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-4xl">
         <header className="mb-8 flex justify-center">
           <Logo />
         </header>
-        <QuizWhizApp />
+        <FirebaseClientProvider>
+          <AppContent />
+        </FirebaseClientProvider>
       </div>
     </main>
   );

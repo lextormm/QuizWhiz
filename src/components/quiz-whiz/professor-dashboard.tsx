@@ -1,0 +1,149 @@
+'use client';
+
+import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import type { QuizAttempt } from "@/app/types";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
+import { format } from 'date-fns';
+
+function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        {subtext && <p className="text-xs text-muted-foreground">{subtext}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ProfessorDashboard() {
+  const { auth, firestore } = useFirebase();
+
+  const attemptsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
+  }, [firestore]);
+
+  const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
+  
+  const analytics = useMemo(() => {
+    if (!attempts || attempts.length === 0) {
+      return {
+        totalAttempts: 0,
+        averageScore: 0,
+        uniqueStudents: 0,
+        topicPerformance: {},
+        bestTopic: { name: 'N/A', score: 0 },
+        worstTopic: { name: 'N/A', score: 100 },
+      };
+    }
+
+    const totalAttempts = attempts.length;
+    const totalScore = attempts.reduce((sum, attempt) => sum + attempt.score, 0);
+    const averageScore = totalScore / totalAttempts;
+    const uniqueStudents = new Set(attempts.map(a => a.studentId)).size;
+
+    const topicPerformance: { [topic: string]: { scores: number[], count: number } } = {};
+    attempts.forEach(attempt => {
+      if (!topicPerformance[attempt.quizTopic]) {
+        topicPerformance[attempt.quizTopic] = { scores: [], count: 0 };
+      }
+      topicPerformance[attempt.quizTopic].scores.push(attempt.score);
+      topicPerformance[attempt.quizTopic].count++;
+    });
+
+    let bestTopic = { name: 'N/A', score: 0 };
+    let worstTopic = { name: 'N/A', score: 100 };
+
+    Object.entries(topicPerformance).forEach(([topic, data]) => {
+      const avg = data.scores.reduce((a, b) => a + b, 0) / data.count;
+      if (avg > bestTopic.score) {
+        bestTopic = { name: topic, score: avg };
+      }
+      if (avg < worstTopic.score) {
+        worstTopic = { name: topic, score: avg };
+      }
+    });
+
+    return { totalAttempts, averageScore, uniqueStudents, bestTopic, worstTopic };
+  }, [attempts]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center text-destructive">Error loading data: {error.message}</div>;
+  }
+
+  return (
+    <div className="space-y-8">
+       <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold">Professor Dashboard</h1>
+            <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+        </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <AnalyticsCard title="Total Attempts" value={analytics.totalAttempts} icon={BookOpen} />
+        <AnalyticsCard title="Class Average" value={`${analytics.averageScore.toFixed(1)}%`} icon={BarChart} />
+        <AnalyticsCard title="Unique Students" value={analytics.uniqueStudents} icon={Users} />
+        <AnalyticsCard title="Best Topic" value={analytics.bestTopic.name} icon={TrendingUp} subtext={`Avg: ${analytics.bestTopic.score.toFixed(1)}%`} />
+        <AnalyticsCard title="Weakest Topic" value={analytics.worstTopic.name} icon={TrendingDown} subtext={`Avg: ${analytics.worstTopic.score.toFixed(1)}%`} />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Quiz Attempts</CardTitle>
+          <CardDescription>A log of all quiz attempts by students.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Topic</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {attempts && attempts.length > 0 ? (
+                attempts.map(attempt => (
+                  <TableRow key={attempt.id}>
+                    <TableCell className="font-medium">{attempt.studentName}</TableCell>
+                    <TableCell>{attempt.quizTopic}</TableCell>
+                    <TableCell>
+                      <Badge variant={attempt.score > 80 ? 'default' : attempt.score > 50 ? 'secondary' : 'destructive'}>
+                        {attempt.score.toFixed(0)}%
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                        {attempt.submittedAt ? format(new Date((attempt.submittedAt as any).seconds * 1000), 'PPp') : 'N/A'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center">No quiz attempts yet.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

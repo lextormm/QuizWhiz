@@ -6,8 +6,12 @@ import { handleGenerateQuiz, handleProvidePerformanceInsights } from "@/app/acti
 import TopicForm from "@/components/quiz-whiz/topic-form";
 import QuizDisplay from "@/components/quiz-whiz/quiz-display";
 import QuizResults from "@/components/quiz-whiz/quiz-results";
-import type { Quiz } from "@/app/types";
+import type { Quiz, QuizAttempt, Answer } from "@/app/types";
 import { Loader2 } from "lucide-react";
+import { useFirebase } from "@/firebase";
+import { addDocumentNonBlocking } from "@/firebase";
+import { collection, serverTimestamp } from "firebase/firestore";
+
 
 type QuizState = "idle" | "generating" | "taking" | "submitting" | "finished";
 
@@ -19,6 +23,7 @@ export default function QuizWhizApp() {
   const [score, setScore] = useState(0);
   const [insights, setInsights] = useState("");
   const { toast } = useToast();
+  const { user, firestore } = useFirebase();
 
   const startQuiz = async (topic: string, numberOfQuestions: number) => {
     setQuizState("generating");
@@ -52,16 +57,38 @@ export default function QuizWhizApp() {
     setQuizState("submitting");
     setUserAnswers(answers);
 
-    if (!quiz || !topic) return;
+    if (!quiz || !topic || !user || !firestore) return;
 
     let correctCount = 0;
-    quiz.forEach((question, index) => {
-      if (question.correctAnswer === answers[index]) {
+    const answeredQuestions: Answer[] = quiz.map((question, index) => {
+      const isCorrect = question.correctAnswer === answers[index];
+      if (isCorrect) {
         correctCount++;
       }
+      return {
+        question: question.question,
+        selectedAnswer: answers[index],
+        correctAnswer: question.correctAnswer,
+        isCorrect: isCorrect,
+      };
     });
+
     const finalScore = (correctCount / quiz.length) * 100;
     setScore(finalScore);
+
+    const attemptWithTimestamp = {
+      studentId: user.uid,
+      studentName: user.displayName || 'Anonymous',
+      quizTopic: topic,
+      // In a real app, you might want to store a quiz ID instead of the whole object
+      // but this is fine for a demo.
+      quiz: quiz,
+      answers: answeredQuestions,
+      score: finalScore,
+      submittedAt: serverTimestamp(),
+    };
+
+    addDocumentNonBlocking(collection(firestore, 'quizAttempts'), attemptWithTimestamp);
 
     const correctAnswers = quiz.map((q) => q.correctAnswer);
     const insightsResult = await handleProvidePerformanceInsights(

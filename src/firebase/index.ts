@@ -2,8 +2,9 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getAuth, updateProfile } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore'
+import { initiateAnonymousSignIn } from './non-blocking-login';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -38,6 +39,21 @@ export function getSdks(firebaseApp: FirebaseApp) {
     auth: getAuth(firebaseApp),
     firestore: getFirestore(firebaseApp)
   };
+}
+
+export async function signIn(name: string, role: 'student' | 'professor') {
+    const { auth, firestore } = initializeFirebase();
+    const cred = await auth.signInAnonymously();
+    if (cred.user) {
+        await updateProfile(cred.user, { displayName: name });
+        const userRef = doc(firestore, 'users', cred.user.uid);
+        await setDoc(userRef, {
+            id: cred.user.uid,
+            name,
+            role,
+        }, { merge: true });
+    }
+    return cred.user;
 }
 
 export * from './provider';
