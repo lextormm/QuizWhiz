@@ -113,7 +113,7 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
       };
       
       const quizzesCollection = collection(firestore, 'quizzes');
-      await addDoc(quizzesCollection, newQuiz).catch(async (serverError) => {
+      addDoc(quizzesCollection, newQuiz).catch(async (serverError) => {
           const permissionError = new FirestorePermissionError({
             path: quizzesCollection.path,
             operation: 'create',
@@ -147,6 +147,9 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
     }
   
     if (error) {
+      // The useCollection hook now throws the error which is caught by the boundary
+      // We can render a fallback UI here, or let the error boundary handle it.
+      // For a better user experience, a component-level message is good.
       return <div className="text-center text-destructive p-4">Error loading data. You may not have permission to view this.</div>;
     }
 
