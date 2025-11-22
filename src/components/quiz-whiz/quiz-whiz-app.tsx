@@ -8,9 +8,8 @@ import QuizDisplay from "@/components/quiz-whiz/quiz-display";
 import QuizResults from "@/components/quiz-whiz/quiz-results";
 import type { Quiz, QuizAttempt, Answer, ProfessorQuiz } from "@/app/types";
 import { Loader2 } from "lucide-react";
-import { useFirebase } from "@/firebase";
-import { addDocumentNonBlocking } from "@/firebase";
-import { collection, serverTimestamp } from "firebase/firestore";
+import { useFirebase, addDocumentNonBlocking } from "@/firebase";
+import { serverTimestamp } from "firebase/firestore";
 
 
 type QuizState = "idle" | "generating" | "taking" | "submitting" | "finished";
@@ -106,7 +105,7 @@ export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQu
       submittedAt: serverTimestamp() as any,
     };
 
-    addDocumentNonBlocking(collection(firestore, 'quizAttempts'), attempt);
+    addDocumentNonBlocking(firestore, 'quizAttempts', attempt);
 
     const correctAnswers = quiz.map((q) => q.correctAnswer);
     const insightsResult = await handleProvidePerformanceInsights(

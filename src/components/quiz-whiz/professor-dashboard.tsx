@@ -1,7 +1,7 @@
 'use client';
 
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import type { QuizAttempt, ProfessorQuiz, Quiz } from "@/app/types";
+import type { QuizAttempt, ProfessorQuiz } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +120,15 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
         createdAt: serverTimestamp(),
       };
       
-      await addDoc(collection(firestore, 'quizzes'), newQuiz);
+      const quizzesCollection = collection(firestore, 'quizzes');
+      await addDoc(quizzesCollection, newQuiz).catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: quizzesCollection.path,
+            operation: 'create',
+            requestResourceData: newQuiz,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+      });
       
       toast({
         title: "Quiz Created!",

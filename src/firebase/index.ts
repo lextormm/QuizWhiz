@@ -3,8 +3,11 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, updateProfile, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore'
+import { getFirestore, doc, setDoc, collection, addDoc, Firestore } from 'firebase/firestore'
 import { initiateAnonymousSignIn } from './non-blocking-login';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -47,14 +50,35 @@ export async function signIn(name: string, role: 'student' | 'professor') {
     if (cred.user) {
         await updateProfile(cred.user, { displayName: name });
         const userRef = doc(firestore, 'users', cred.user.uid);
-        await setDoc(userRef, {
+        
+        setDoc(userRef, {
             id: cred.user.uid,
             name,
             role,
-        }, { merge: true });
+        }, { merge: true }).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'write',
+                requestResourceData: {id: cred.user.uid, name, role}
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     }
     return cred.user;
 }
+
+export function addDocumentNonBlocking(db: Firestore, collectionName: string, data: any) {
+    const collRef = collection(db, collectionName);
+    addDoc(collRef, data).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: collRef.path,
+            operation: 'create',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+}
+
 
 export * from './provider';
 export * from './client-provider';
