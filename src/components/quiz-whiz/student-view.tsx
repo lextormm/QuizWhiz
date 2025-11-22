@@ -8,7 +8,6 @@ import type { ProfessorQuiz } from "@/app/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Loader2, BookCopy } from "lucide-react";
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
 
 const ProfessorQuizList = ({ onTakeQuiz }: { onTakeQuiz: (quiz: ProfessorQuiz) => void }) => {
     const { firestore } = useFirebase();
@@ -56,72 +55,33 @@ const ProfessorQuizList = ({ onTakeQuiz }: { onTakeQuiz: (quiz: ProfessorQuiz) =
 export default function StudentView() {
     const { auth, user } = useFirebase();
     const [selectedQuiz, setSelectedQuiz] = useState<ProfessorQuiz | null>(null);
-    const [showGeneratedQuiz, setShowGeneratedQuiz] = useState(false);
 
     const handleTakeProfessorQuiz = (quiz: ProfessorQuiz) => {
         setSelectedQuiz(quiz);
     };
 
-    const handleStartGeneratedQuiz = () => {
+    const handleBackToList = () => {
         setSelectedQuiz(null);
-        setShowGeneratedQuiz(true);
-    };
-
-    const handleGoBack = () => {
-        setSelectedQuiz(null);
-        setShowGeneratedQuiz(false);
     }
 
     const renderContent = () => {
         if (selectedQuiz) {
-            return (
-                <div className="space-y-4">
-                    <Button variant="outline" onClick={handleGoBack}>
-                        <ArrowLeft className="mr-2 h-4 w-4"/>
-                        Back to Quizzes
-                    </Button>
-                    <QuizWhizApp professorQuiz={selectedQuiz} />
-                </div>
-            )
-        }
-
-        if (showGeneratedQuiz) {
-             return (
-                <div className="space-y-4">
-                    <Button variant="outline" onClick={handleGoBack}>
-                        <ArrowLeft className="mr-2 h-4 w-4"/>
-                        Back to Menu
-                    </Button>
-                    <QuizWhizApp />
-                </div>
-            )
+            return <QuizWhizApp professorQuiz={selectedQuiz} onRestart={handleBackToList} />
         }
 
         return (
-            <div className="space-y-8">
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Create Your Own Quiz</CardTitle>
-                        <CardDescription>Generate a custom quiz on any topic you want to practice.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button onClick={handleStartGeneratedQuiz} className="w-full">Start a New Quiz</Button>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                           <BookCopy className="h-5 w-5 text-primary"/>
-                            <CardTitle>Quizzes by Professors</CardTitle>
-                        </div>
-                        <CardDescription>Take a quiz prepared by your professor to test your knowledge.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ProfessorQuizList onTakeQuiz={handleTakeProfessorQuiz} />
-                    </CardContent>
-                </Card>
-            </div>
+             <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                       <BookCopy className="h-5 w-5 text-primary"/>
+                        <CardTitle>Quizzes by Professors</CardTitle>
+                    </div>
+                    <CardDescription>Take a quiz prepared by your professor to test your knowledge.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ProfessorQuizList onTakeQuiz={handleTakeProfessorQuiz} />
+                </CardContent>
+            </Card>
         )
     }
 
