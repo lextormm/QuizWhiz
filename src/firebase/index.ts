@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, updateProfile } from 'firebase/auth';
+import { getAuth, updateProfile, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore'
 import { initiateAnonymousSignIn } from './non-blocking-login';
 
@@ -43,7 +43,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
 
 export async function signIn(name: string, role: 'student' | 'professor') {
     const { auth, firestore } = initializeFirebase();
-    const cred = await auth.signInAnonymously();
+    const cred = await signInAnonymously(auth);
     if (cred.user) {
         await updateProfile(cred.user, { displayName: name });
         const userRef = doc(firestore, 'users', cred.user.uid);
