@@ -41,7 +41,17 @@ Quiz Topic: {{{quizTopic}}}
 User Answers: {{#each userAnswers}}{{{this}}}, {{/each}}
 Correct Answers: {{#each correctAnswers}}{{{this}}}, {{/each}}
 
-Focus on identifying areas where the user needs improvement and areas where they demonstrated strong understanding. Provide actionable recommendations for improvement and highlight the user's strengths to encourage continued learning.
+Your response MUST be structured as follows, with no additional text or explanations:
+
+Areas of Strong Understanding
+* [strength 1]
+* [strength 2]
+
+Areas for Improvement
+* [area for improvement 1]
+* [area for improvement 2]
+
+Provide actionable recommendations for improvement and highlight the user's strengths to encourage continued learning.
 `,
 });
 
