@@ -16,7 +16,7 @@ const AppContent = () => {
     user ? doc(firestore, "users", user.uid) : null
   , [firestore, user]);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<{ role: 'student' | 'professor' }>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<{ id: string; name: string; role: 'student' | 'professor' }>(userProfileRef);
   
   const isLoading = isAuthLoading || (user && isProfileLoading);
 
@@ -35,7 +35,7 @@ const AppContent = () => {
 
   // Once profile is loaded, decide which view to render
   if (userProfile?.role === 'professor') {
-    return <ProfessorDashboard />;
+    return <ProfessorDashboard professor={userProfile} />;
   }
 
   if (userProfile?.role === 'student') {

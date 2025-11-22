@@ -6,7 +6,7 @@ import { handleGenerateQuiz, handleProvidePerformanceInsights } from "@/app/acti
 import TopicForm from "@/components/quiz-whiz/topic-form";
 import QuizDisplay from "@/components/quiz-whiz/quiz-display";
 import QuizResults from "@/components/quiz-whiz/quiz-results";
-import type { Quiz, QuizAttempt, Answer } from "@/app/types";
+import type { Quiz, QuizAttempt, Answer, ProfessorQuiz } from "@/app/types";
 import { Loader2 } from "lucide-react";
 import { useFirebase } from "@/firebase";
 import { addDocumentNonBlocking } from "@/firebase";
@@ -15,19 +15,21 @@ import { collection, serverTimestamp } from "firebase/firestore";
 
 type QuizState = "idle" | "generating" | "taking" | "submitting" | "finished";
 
-export default function QuizWhizApp() {
+export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQuiz: (quiz: ProfessorQuiz) => void }) {
   const [quizState, setQuizState] = useState<QuizState>("idle");
   const [topic, setTopic] = useState("");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [quizId, setQuizId] = useState<string | undefined>(undefined);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [insights, setInsights] = useState("");
   const { toast } = useToast();
   const { user, firestore } = useFirebase();
 
-  const startQuiz = async (topic: string, numberOfQuestions: number) => {
+  const startGeneratedQuiz = async (topic: string, numberOfQuestions: number) => {
     setQuizState("generating");
     setTopic(topic);
+    setQuizId(undefined); // This is a student-generated quiz
     const result = await handleGenerateQuiz(topic, numberOfQuestions);
 
     if (result.success && result.data) {
@@ -53,6 +55,23 @@ export default function QuizWhizApp() {
     }
   };
 
+  const startProfessorQuiz = (profQuiz: ProfessorQuiz) => {
+    setTopic(profQuiz.topic);
+    setQuiz(profQuiz.questions);
+    setQuizId(profQuiz.id);
+    setUserAnswers(new Array(profQuiz.questions.length).fill(""));
+    setQuizState("taking");
+  };
+
+  // This effect will be triggered from the parent component
+  const handleTakeProfessorQuiz = (quiz: ProfessorQuiz) => {
+    startProfessorQuiz(quiz);
+  };
+  
+  // Expose the function to the parent
+  onTakeProfessorQuiz.prototype.start = handleTakeProfessorQuiz;
+
+
   const finishQuiz = async (answers: string[]) => {
     setQuizState("submitting");
     setUserAnswers(answers);
@@ -76,19 +95,18 @@ export default function QuizWhizApp() {
     const finalScore = (correctCount / quiz.length) * 100;
     setScore(finalScore);
 
-    const attemptWithTimestamp = {
+    const attempt: Omit<QuizAttempt, 'id'> = {
       studentId: user.uid,
       studentName: user.displayName || 'Anonymous',
       quizTopic: topic,
-      // In a real app, you might want to store a quiz ID instead of the whole object
-      // but this is fine for a demo.
+      quizId: quizId,
       quiz: quiz,
       answers: answeredQuestions,
       score: finalScore,
-      submittedAt: serverTimestamp(),
+      submittedAt: serverTimestamp() as any,
     };
 
-    addDocumentNonBlocking(collection(firestore, 'quizAttempts'), attemptWithTimestamp);
+    addDocumentNonBlocking(collection(firestore, 'quizAttempts'), attempt);
 
     const correctAnswers = quiz.map((q) => q.correctAnswer);
     const insightsResult = await handleProvidePerformanceInsights(
@@ -152,7 +170,7 @@ export default function QuizWhizApp() {
         );
       case "idle":
       default:
-        return <TopicForm onStartQuiz={startQuiz} />;
+        return <TopicForm onStartQuiz={startGeneratedQuiz} />;
     }
   };
 

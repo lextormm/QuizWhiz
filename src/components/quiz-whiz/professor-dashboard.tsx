@@ -1,17 +1,20 @@
 'use client';
 
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import type { QuizAttempt } from "@/app/types";
+import type { QuizAttempt, ProfessorQuiz, Quiz } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
+import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen, PlusCircle } from "lucide-react";
 import { format } from 'date-fns';
-import { useMemo } from "react";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useMemo, useState } from "react";
+import { collection, query, orderBy, serverTimestamp, addDoc } from "firebase/firestore";
 import { doc } from "firebase/firestore";
 import { useDoc } from "@/firebase/firestore/use-doc";
+import TopicForm from "./topic-form";
+import { useToast } from "@/hooks/use-toast";
+import { handleGenerateQuiz } from "@/app/actions";
 
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
@@ -29,9 +32,12 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
   );
 }
 
-export default function ProfessorDashboard() {
+export default function ProfessorDashboard({ professor }: { professor: {id: string, name: string, role: 'professor'}}) {
   const { auth, firestore } = useFirebase();
   const { user } = useUser();
+  const { toast } = useToast();
+  const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const userProfileRef = useMemoFirebase(() => 
     user ? doc(firestore, "users", user.uid) : null
@@ -44,7 +50,6 @@ export default function ProfessorDashboard() {
       if (firestore && userProfile?.role === 'professor') {
         return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
       }
-      // In all other cases (loading, not a professor, etc.), return null.
       return null;
   }, [firestore, userProfile]);
 
@@ -91,6 +96,47 @@ export default function ProfessorDashboard() {
     return { totalAttempts, averageScore, uniqueStudents, bestTopic, worstTopic };
   }, [attempts]);
 
+  const handleStartCreateQuiz = () => {
+    setIsCreatingQuiz(true);
+  };
+
+  const handleCancelCreateQuiz = () => {
+    setIsCreatingQuiz(false);
+  }
+
+  const handleCreateQuiz = async (topic: string, numberOfQuestions: number) => {
+    if (!firestore || !user) return;
+    
+    setIsGenerating(true);
+    const result = await handleGenerateQuiz(topic, numberOfQuestions);
+    setIsGenerating(false);
+
+    if (result.success && result.data) {
+      const newQuiz: Omit<ProfessorQuiz, 'id' | 'createdAt'> & { createdAt: any } = {
+        topic,
+        authorId: user.uid,
+        authorName: professor.name,
+        questions: result.data,
+        createdAt: serverTimestamp(),
+      };
+      
+      await addDoc(collection(firestore, 'quizzes'), newQuiz);
+      
+      toast({
+        title: "Quiz Created!",
+        description: `Your quiz on "${topic}" is now available for students.`,
+      });
+      setIsCreatingQuiz(false);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: result.error || "Failed to generate quiz.",
+      });
+    }
+  };
+
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -102,6 +148,24 @@ export default function ProfessorDashboard() {
   
     if (error) {
       return <div className="text-center text-destructive p-4">Error loading data. You may not have permission to view this.</div>;
+    }
+
+    if (isGenerating) {
+        return (
+          <div className="flex flex-col items-center gap-4 text-center p-8">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-lg font-medium">Generating your new quiz...</p>
+          </div>
+        );
+    }
+
+    if (isCreatingQuiz) {
+        return (
+            <div>
+                <TopicForm onStartQuiz={handleCreateQuiz} />
+                <Button variant="ghost" onClick={handleCancelCreateQuiz} className="mt-4 w-full">Cancel</Button>
+            </div>
+        )
     }
 
     return (
@@ -157,8 +221,18 @@ export default function ProfessorDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Student Results</CardTitle>
-          <CardDescription>A real-time log of all quiz attempts and scores for each student.</CardDescription>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle>Student Results</CardTitle>
+                    <CardDescription>A real-time log of all quiz attempts and scores.</CardDescription>
+                </div>
+                {!isCreatingQuiz && (
+                    <Button onClick={handleStartCreateQuiz}>
+                        <PlusCircle className="mr-2 h-4 w-4"/>
+                        Create New Quiz
+                    </Button>
+                )}
+          </div>
         </CardHeader>
         <CardContent>
           {renderContent()}
