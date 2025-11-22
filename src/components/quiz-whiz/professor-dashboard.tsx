@@ -39,6 +39,7 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
   const [isGenerating, setIsGenerating] = useState(false);
   
   const attemptsQuery = useMemoFirebase(() => {
+      // Stricter guard: only create the query if we are certain the user is a professor.
       if (firestore && professor?.role === 'professor') {
         return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
       }

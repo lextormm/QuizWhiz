@@ -33,13 +33,14 @@ const AppContent = () => {
     return <Login />;
   }
   
+  // This is the critical change: Only render ProfessorDashboard if we are certain the user is a professor.
+  // In all other cases (student role, or while profile is loading after auth is ready)
+  // default to the StudentView. This prevents the ProfessorDashboard and its
+  // data-fetching hooks from ever being mounted for a non-professor user.
   if (userProfile?.role === 'professor') {
     return <ProfessorDashboard professor={userProfile} />;
   }
 
-  // In all other cases (student role, or while profile is loading after auth is ready)
-  // default to the StudentView. This prevents the ProfessorDashboard and its
-  // data-fetching hooks from ever being mounted for a non-professor user.
   return <StudentView />;
 };
 
