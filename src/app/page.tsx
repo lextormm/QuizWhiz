@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser, FirebaseClientProvider, useDoc, useFirebase } from "@/firebase";
+import { useUser, FirebaseClientProvider, useDoc, useFirebase, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Logo } from "@/components/quiz-whiz/logo";
 import { Loader2 } from "lucide-react";
@@ -12,7 +12,10 @@ const AppContent = () => {
   const { user, isUserLoading: isAuthLoading } = useUser();
   const { firestore } = useFirebase();
 
-  const userProfileRef = user ? doc(firestore, "users", user.uid) : null;
+  const userProfileRef = useMemoFirebase(() => 
+    user ? doc(firestore, "users", user.uid) : null
+  , [firestore, user]);
+
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<{ role: string }>(userProfileRef);
 
   const isLoading = isAuthLoading || (user && isProfileLoading);
