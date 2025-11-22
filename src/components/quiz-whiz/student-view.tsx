@@ -1,9 +1,9 @@
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirebase, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { Button } from "../ui/button";
 import QuizWhizApp from "./quiz-whiz-app";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { collection, query, where, orderBy, doc } from "firebase/firestore";
 import type { QuizAttempt } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,16 +12,24 @@ import { Loader2 } from "lucide-react";
 import { format } from 'date-fns';
 
 function PastQuizzes() {
-    const { firestore, user } = useFirebase();
+    const { firestore } = useFirebase();
+    const { user } = useUser();
+
+    const userProfileRef = useMemoFirebase(() =>
+        user ? doc(firestore, "users", user.uid) : null
+    , [firestore, user]);
+    const { data: userProfile } = useDoc<{ role: string }>(userProfileRef);
   
     const attemptsQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return query(
-        collection(firestore, "quizAttempts"),
-        where("studentId", "==", user.uid),
-        orderBy("submittedAt", "desc")
-      );
-    }, [firestore, user]);
+      if (firestore && user && userProfile?.role === 'student') {
+        return query(
+          collection(firestore, "quizAttempts"),
+          where("studentId", "==", user.uid),
+          orderBy("submittedAt", "desc")
+        );
+      }
+      return null;
+    }, [firestore, user, userProfile]);
   
     const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   

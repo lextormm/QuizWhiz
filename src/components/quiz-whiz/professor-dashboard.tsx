@@ -1,7 +1,7 @@
 'use client';
 
-import { useCollection, useFirebase, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useCollection, useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, doc } from "firebase/firestore";
 import type { QuizAttempt } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,12 +27,21 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
 }
 
 export default function ProfessorDashboard() {
-  const { auth, firestore, user } = useFirebase();
+  const { auth, firestore } = useFirebase();
+  const { user } = useUser();
+
+  const userProfileRef = useMemoFirebase(() =>
+    user ? doc(firestore, "users", user.uid) : null
+  , [firestore, user]);
+  const { data: userProfile } = useDoc<{ role: string }>(userProfileRef);
 
   const attemptsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
-  }, [firestore]);
+    // Only create the query if the user is a professor
+    if (firestore && userProfile?.role === 'professor') {
+      return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
+    }
+    return null;
+  }, [firestore, userProfile]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
