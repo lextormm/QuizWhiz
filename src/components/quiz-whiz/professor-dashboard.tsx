@@ -106,8 +106,8 @@ export default function ProfessorDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Student Quiz Attempts</CardTitle>
-          <CardDescription>A log of all quiz attempts by students.</CardDescription>
+          <CardTitle>Student Results</CardTitle>
+          <CardDescription>A real-time log of all quiz attempts and scores for each student.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
