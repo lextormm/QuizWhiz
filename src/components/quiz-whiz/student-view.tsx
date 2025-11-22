@@ -7,7 +7,8 @@ import { collection, query, orderBy } from "firebase/firestore";
 import type { ProfessorQuiz } from "@/app/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Loader2, BookCopy } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 const ProfessorQuizList = ({ onTakeQuiz }: { onTakeQuiz: (quiz: ProfessorQuiz) => void }) => {
     const { firestore } = useFirebase();
@@ -39,12 +40,12 @@ const ProfessorQuizList = ({ onTakeQuiz }: { onTakeQuiz: (quiz: ProfessorQuiz) =
     return (
         <div className="space-y-4">
             {quizzes.map(quiz => (
-                <Card key={quiz.id} className="flex flex-row items-center justify-between p-4">
-                    <div>
+                <Card key={quiz.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
+                    <div className="flex-grow">
                         <h3 className="font-semibold">{quiz.topic}</h3>
                         <p className="text-sm text-muted-foreground">Quiz by {quiz.authorName}</p>
                     </div>
-                    <Button onClick={() => onTakeQuiz(quiz)}>Start Quiz</Button>
+                    <Button onClick={() => onTakeQuiz(quiz)} className="w-full sm:w-auto">Start Quiz</Button>
                 </Card>
             ))}
         </div>
@@ -54,22 +55,46 @@ const ProfessorQuizList = ({ onTakeQuiz }: { onTakeQuiz: (quiz: ProfessorQuiz) =
 
 export default function StudentView() {
     const { auth, user } = useFirebase();
-    const [view, setView] = useState<'menu' | 'quiz'>('menu');
-    const quizAppRef = useRef<((quiz: ProfessorQuiz) => void) & { start?: (quiz: ProfessorQuiz) => void }>(() => {});
+    const [selectedQuiz, setSelectedQuiz] = useState<ProfessorQuiz | null>(null);
+    const [showGeneratedQuiz, setShowGeneratedQuiz] = useState(false);
 
     const handleTakeProfessorQuiz = (quiz: ProfessorQuiz) => {
-        setView('quiz');
-        // The timeout ensures the component has re-rendered and the ref is attached
-        setTimeout(() => {
-            if(quizAppRef.current.start) {
-                quizAppRef.current.start(quiz);
-            }
-        }, 0);
+        setSelectedQuiz(quiz);
     };
 
+    const handleStartGeneratedQuiz = () => {
+        setSelectedQuiz(null);
+        setShowGeneratedQuiz(true);
+    };
+
+    const handleGoBack = () => {
+        setSelectedQuiz(null);
+        setShowGeneratedQuiz(false);
+    }
+
     const renderContent = () => {
-        if (view === 'quiz') {
-            return <QuizWhizApp onTakeProfessorQuiz={quizAppRef.current} />;
+        if (selectedQuiz) {
+            return (
+                <div className="space-y-4">
+                    <Button variant="outline" onClick={handleGoBack}>
+                        <ArrowLeft className="mr-2 h-4 w-4"/>
+                        Back to Quizzes
+                    </Button>
+                    <QuizWhizApp professorQuiz={selectedQuiz} />
+                </div>
+            )
+        }
+
+        if (showGeneratedQuiz) {
+             return (
+                <div className="space-y-4">
+                    <Button variant="outline" onClick={handleGoBack}>
+                        <ArrowLeft className="mr-2 h-4 w-4"/>
+                        Back to Menu
+                    </Button>
+                    <QuizWhizApp />
+                </div>
+            )
         }
 
         return (
@@ -80,7 +105,7 @@ export default function StudentView() {
                         <CardDescription>Generate a custom quiz on any topic you want to practice.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <QuizWhizApp onTakeProfessorQuiz={() => {}} />
+                        <Button onClick={handleStartGeneratedQuiz} className="w-full">Start a New Quiz</Button>
                     </CardContent>
                 </Card>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { handleGenerateQuiz, handleProvidePerformanceInsights } from "@/app/actions";
 import TopicForm from "@/components/quiz-whiz/topic-form";
@@ -14,7 +14,11 @@ import { serverTimestamp } from "firebase/firestore";
 
 type QuizState = "idle" | "generating" | "taking" | "submitting" | "finished";
 
-export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQuiz: (quiz: ProfessorQuiz) => void }) {
+interface QuizWhizAppProps {
+  professorQuiz?: ProfessorQuiz | null;
+}
+
+export default function QuizWhizApp({ professorQuiz = null }: QuizWhizAppProps) {
   const [quizState, setQuizState] = useState<QuizState>("idle");
   const [topic, setTopic] = useState("");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -24,6 +28,12 @@ export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQu
   const [insights, setInsights] = useState("");
   const { toast } = useToast();
   const { user, firestore } = useFirebase();
+
+  useEffect(() => {
+    if (professorQuiz) {
+      startProfessorQuiz(professorQuiz);
+    }
+  }, [professorQuiz]);
 
   const startGeneratedQuiz = async (topic: string, numberOfQuestions: number) => {
     setQuizState("generating");
@@ -61,14 +71,6 @@ export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQu
     setUserAnswers(new Array(profQuiz.questions.length).fill(""));
     setQuizState("taking");
   };
-
-  // This effect will be triggered from the parent component
-  const handleTakeProfessorQuiz = (quiz: ProfessorQuiz) => {
-    startProfessorQuiz(quiz);
-  };
-  
-  // Expose the function to the parent
-  onTakeProfessorQuiz.prototype.start = handleTakeProfessorQuiz;
 
 
   const finishQuiz = async (answers: string[]) => {
@@ -169,6 +171,17 @@ export default function QuizWhizApp({ onTakeProfessorQuiz }: { onTakeProfessorQu
         );
       case "idle":
       default:
+        // If a professor quiz was passed, we shouldn't be in idle state.
+        // It will quickly transition to 'taking' via useEffect.
+        // But if we're here, it means we should show the topic form.
+        if (professorQuiz) {
+           return (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-lg font-medium">Loading quiz...</p>
+            </div>
+           );
+        }
         return <TopicForm onStartQuiz={startGeneratedQuiz} />;
     }
   };
