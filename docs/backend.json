@@ -240,7 +240,7 @@
           "schema": {
             "$ref": "#/entities/QuizAttempt"
           },
-          "description": "Stores all quiz attempts from all students. Student can only write their own. Professor can read all."
+          "description": "Stores all quiz attempts from all students. Student can only write their own and read their own. Professor can read all."
         }
       }
     ]
