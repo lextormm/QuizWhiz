@@ -10,11 +10,10 @@ import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen, PlusCircl
 import { format } from 'date-fns';
 import { useMemo, useState } from "react";
 import { collection, query, orderBy, serverTimestamp, addDoc } from "firebase/firestore";
-import { doc } from "firebase/firestore";
-import { useDoc } from "@/firebase/firestore/use-doc";
 import TopicForm from "./topic-form";
 import { useToast } from "@/hooks/use-toast";
 import { handleGenerateQuiz } from "@/app/actions";
+import { FirestorePermissionError, errorEmitter } from "@/firebase";
 
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
@@ -39,19 +38,12 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  const userProfileRef = useMemoFirebase(() => 
-    user ? doc(firestore, "users", user.uid) : null
-  , [firestore, user]);
-
-  const { data: userProfile } = useDoc<{ role: 'student' | 'professor' }>(userProfileRef);
-
   const attemptsQuery = useMemoFirebase(() => {
-      // Only construct the query if we have the firestore instance AND the user is confirmed to be a professor.
-      if (firestore && userProfile?.role === 'professor') {
+      if (firestore && professor?.role === 'professor') {
         return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
       }
       return null;
-  }, [firestore, userProfile]);
+  }, [firestore, professor]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
