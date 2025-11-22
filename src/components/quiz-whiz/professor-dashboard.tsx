@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
 import { format } from 'date-fns';
 import { useMemo } from "react";
-import { collection, query, orderBy, where } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
+import { doc } from "firebase/firestore";
+import { useDoc } from "@/firebase/firestore/use-doc";
 
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
@@ -30,12 +32,18 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
 export default function ProfessorDashboard() {
   const { auth, firestore } = useFirebase();
   const { user } = useUser();
+  
+  const userProfileRef = useMemoFirebase(() => 
+    user ? doc(firestore, "users", user.uid) : null
+  , [firestore, user]);
+
+  const { data: userProfile } = useDoc<{ role: 'student' | 'professor' }>(userProfileRef);
 
   const attemptsQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      // Professors see all attempts
+      // Only run the query if we know the user is a professor
+      if (!firestore || !userProfile || userProfile.role !== 'professor') return null;
       return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
-  }, [firestore]);
+  }, [firestore, userProfile]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
@@ -45,7 +53,6 @@ export default function ProfessorDashboard() {
         totalAttempts: 0,
         averageScore: 0,
         uniqueStudents: 0,
-        topicPerformance: {},
         bestTopic: { name: 'N/A', score: 0 },
         worstTopic: { name: 'N/A', score: 100 },
       };
