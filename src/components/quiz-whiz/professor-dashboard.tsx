@@ -1,6 +1,6 @@
 'use client';
 
-import { useFirebase, useUser } from "@/firebase";
+import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import type { QuizAttempt } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,13 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
 import { format } from 'date-fns';
 import { useMemo } from "react";
-import type { FirestoreError } from "firebase/firestore";
+import { collection, query, orderBy, where } from "firebase/firestore";
 
-interface ProfessorDashboardProps {
-  attempts: QuizAttempt[] | null;
-  isLoading: boolean;
-  error: FirestoreError | Error | null;
-}
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
   return (
@@ -32,9 +27,17 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
   );
 }
 
-export default function ProfessorDashboard({ attempts, isLoading, error }: ProfessorDashboardProps) {
-  const { auth } = useFirebase();
+export default function ProfessorDashboard() {
+  const { auth, firestore } = useFirebase();
   const { user } = useUser();
+
+  const attemptsQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      // Professors see all attempts
+      return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
+  }, [firestore]);
+
+  const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
   const analytics = useMemo(() => {
     if (!attempts || attempts.length === 0) {
