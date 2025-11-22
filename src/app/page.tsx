@@ -32,20 +32,14 @@ const AppContent = () => {
   if (!user) {
     return <Login />;
   }
-
-  // Only render the ProfessorDashboard if the profile is loaded and the role is 'professor'.
-  // In all other cases (loading profile, student role), default to the student view or a safe loading state.
+  
   if (userProfile?.role === 'professor') {
     return <ProfessorDashboard professor={userProfile} />;
   }
-  
-  // Render StudentView if role is student, or as a safe default while profile might be loading after auth is resolved.
-  if (userProfile?.role === 'student') {
-    return <StudentView />;
-  }
 
-  // Fallback for the brief moment after auth is ready but profile is not yet loaded.
-  // We avoid rendering the professor dashboard here to prevent the permission error.
+  // In all other cases (student role, or while profile is loading after auth is ready)
+  // default to the StudentView. This prevents the ProfessorDashboard and its
+  // data-fetching hooks from ever being mounted for a non-professor user.
   return <StudentView />;
 };
 
