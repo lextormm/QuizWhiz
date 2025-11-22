@@ -18,27 +18,16 @@ const AppContent = () => {
   , [firestore, user]);
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<{ role: 'student' | 'professor' }>(userProfileRef);
-
-  // Define the query based on the user's role
-  const attemptsQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile) return null; // Wait for profile
-
-    if (userProfile.role === 'professor') {
-      // Professor gets all attempts
+  
+  // This query is ONLY for the professor. It will not run for students.
+  const professorAttemptsQuery = useMemoFirebase(() => {
+    if (firestore && userProfile?.role === 'professor') {
       return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
     }
-    if (userProfile.role === 'student' && user) {
-      // Student only gets their own attempts
-      return query(
-        collection(firestore, "quizAttempts"),
-        where("studentId", "==", user.uid),
-        orderBy("submittedAt", "desc")
-      );
-    }
-    return null; // Return null if role is not determined yet
-  }, [firestore, user, userProfile]);
+    return null; // Return null for students or when loading
+  }, [firestore, userProfile]);
 
-  const { data: attempts, isLoading: isAttemptsLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
+  const { data: professorAttempts, isLoading: isAttemptsLoading, error } = useCollection<QuizAttempt>(professorAttemptsQuery);
   
   const isLoading = isAuthLoading || (user && isProfileLoading);
 
@@ -57,11 +46,12 @@ const AppContent = () => {
 
   // Once profile is loaded, decide which view to render
   if (userProfile?.role === 'professor') {
-    return <ProfessorDashboard attempts={attempts} isLoading={isAttemptsLoading} error={error} />;
+    return <ProfessorDashboard attempts={professorAttempts} isLoading={isAttemptsLoading} error={error} />;
   }
 
   if (userProfile?.role === 'student') {
-    return <StudentView attempts={attempts} isLoading={isAttemptsLoading} error={error} />;
+    // StudentView no longer needs any special data props
+    return <StudentView />;
   }
 
   // Fallback while profile is loading after auth is confirmed
