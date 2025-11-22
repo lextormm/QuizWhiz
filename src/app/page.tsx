@@ -33,22 +33,20 @@ const AppContent = () => {
     return <Login />;
   }
 
-  // Once profile is loaded, decide which view to render
+  // Only render the ProfessorDashboard if the profile is loaded and the role is 'professor'.
+  // In all other cases (loading profile, student role), default to the student view or a safe loading state.
   if (userProfile?.role === 'professor') {
     return <ProfessorDashboard professor={userProfile} />;
   }
-
+  
+  // Render StudentView if role is student, or as a safe default while profile might be loading after auth is resolved.
   if (userProfile?.role === 'student') {
     return <StudentView />;
   }
 
-  // Fallback while profile is loading after auth is confirmed
-  return (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <p className="text-lg font-medium">Verifying user role...</p>
-    </div>
-  );
+  // Fallback for the brief moment after auth is ready but profile is not yet loaded.
+  // We avoid rendering the professor dashboard here to prevent the permission error.
+  return <StudentView />;
 };
 
 export default function Home() {
