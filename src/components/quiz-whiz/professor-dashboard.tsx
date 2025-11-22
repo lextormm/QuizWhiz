@@ -1,7 +1,6 @@
 'use client';
 
-import { useCollection, useFirebase, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc } from "firebase/firestore";
+import { useFirebase, useUser } from "@/firebase";
 import type { QuizAttempt } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Loader2, BarChart, Users, TrendingUp, TrendingDown, BookOpen } from "lucide-react";
 import { format } from 'date-fns';
 import { useMemo } from "react";
+import type { FirestoreError } from "firebase/firestore";
+
+interface ProfessorDashboardProps {
+  attempts: QuizAttempt[] | null;
+  isLoading: boolean;
+  error: FirestoreError | Error | null;
+}
 
 function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; value: string | number; icon: React.ElementType, subtext?: string }) {
   return (
@@ -26,24 +32,9 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
   );
 }
 
-export default function ProfessorDashboard() {
-  const { auth, firestore } = useFirebase();
+export default function ProfessorDashboard({ attempts, isLoading, error }: ProfessorDashboardProps) {
+  const { auth } = useFirebase();
   const { user } = useUser();
-
-  const userProfileRef = useMemoFirebase(() =>
-    user ? doc(firestore, "users", user.uid) : null
-  , [firestore, user]);
-  const { data: userProfile } = useDoc<{ role: string }>(userProfileRef);
-
-  const attemptsQuery = useMemoFirebase(() => {
-    // Only create the query if the user is a professor
-    if (firestore && userProfile?.role === 'professor') {
-      return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
-    }
-    return null;
-  }, [firestore, userProfile]);
-
-  const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
   const analytics = useMemo(() => {
     if (!attempts || attempts.length === 0) {
@@ -87,40 +78,21 @@ export default function ProfessorDashboard() {
     return { totalAttempts, averageScore, uniqueStudents, bestTopic, worstTopic };
   }, [attempts]);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="text-center text-destructive">Error loading data: {error.message}</div>;
-  }
-
-  return (
-    <div className="space-y-8">
-       <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">Professor Dashboard</h1>
-            <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
+      );
+    }
+  
+    if (error) {
+      return <div className="text-center text-destructive">Error loading data: {error.message}</div>;
+    }
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <AnalyticsCard title="Total Attempts" value={analytics.totalAttempts} icon={BookOpen} />
-        <AnalyticsCard title="Class Average" value={`${analytics.averageScore.toFixed(1)}%`} icon={BarChart} />
-        <AnalyticsCard title="Unique Students" value={analytics.uniqueStudents} icon={Users} />
-        <AnalyticsCard title="Best Topic" value={analytics.bestTopic.name} icon={TrendingUp} subtext={`Avg: ${analytics.bestTopic.score.toFixed(1)}%`} />
-        <AnalyticsCard title="Weakest Topic" value={analytics.worstTopic.name} icon={TrendingDown} subtext={`Avg: ${analytics.worstTopic.score.toFixed(1)}%`} />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Student Results</CardTitle>
-          <CardDescription>A real-time log of all quiz attempts and scores for each student.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
+    return (
+        <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
@@ -136,7 +108,7 @@ export default function ProfessorDashboard() {
                     <TableCell className="font-medium">{attempt.studentName}</TableCell>
                     <TableCell>{attempt.quizTopic}</TableCell>
                     <TableCell>
-                      <Badge variant={attempt.score >= 80 ? 'default' : attempt.score > 50 ? 'secondary' : 'destructive'}>
+                      <Badge variant={attempt.score >= 80 ? 'success' : attempt.score > 50 ? 'secondary' : 'destructive'}>
                         {attempt.score.toFixed(0)}%
                       </Badge>
                     </TableCell>
@@ -152,6 +124,31 @@ export default function ProfessorDashboard() {
               )}
             </TableBody>
           </Table>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+       <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold">Professor Dashboard</h1>
+            <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+        </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <AnalyticsCard title="Total Attempts" value={analytics.totalAttempts} icon={BookOpen} />
+        <AnalyticsCard title="Class Average" value={`${analytics.averageScore.toFixed(1)}%`} icon={BarChart} />
+        <AnalyticsCard title="Unique Students" value={analytics.uniqueStudents} icon={Users} />
+        <AnalyticsCard title="Best Topic" value={analytics.bestTopic.name} icon={TrendingUp} subtext={`Avg: ${analytics.bestTopic.score.toFixed(1)}%`} />
+        <AnalyticsCard title="Weakest Topic" value={analytics.worstTopic.name} icon={TrendingDown} subtext={`Avg: ${analytics.worstTopic.score.toFixed(1)}%`} />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Student Results</CardTitle>
+          <CardDescription>A real-time log of all quiz attempts and scores for each student.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {renderContent()}
         </CardContent>
       </Card>
     </div>

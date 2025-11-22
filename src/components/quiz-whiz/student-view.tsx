@@ -1,38 +1,23 @@
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase, useUser, useDoc } from "@/firebase";
+import { useFirebase, useUser } from "@/firebase";
 import { Button } from "../ui/button";
 import QuizWhizApp from "./quiz-whiz-app";
-import { collection, query, where, orderBy, doc } from "firebase/firestore";
 import type { QuizAttempt } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { format } from 'date-fns';
+import type { FirestoreError } from "firebase/firestore";
 
-function PastQuizzes() {
-    const { firestore } = useFirebase();
-    const { user } = useUser();
+interface PastQuizzesProps {
+    attempts: QuizAttempt[] | null;
+    isLoading: boolean;
+    error: FirestoreError | Error | null;
+}
 
-    const userProfileRef = useMemoFirebase(() =>
-        user ? doc(firestore, "users", user.uid) : null
-    , [firestore, user]);
-    const { data: userProfile } = useDoc<{ role: string }>(userProfileRef);
-  
-    const attemptsQuery = useMemoFirebase(() => {
-      if (firestore && user && userProfile?.role === 'student') {
-        return query(
-          collection(firestore, "quizAttempts"),
-          where("studentId", "==", user.uid),
-          orderBy("submittedAt", "desc")
-        );
-      }
-      return null;
-    }, [firestore, user, userProfile]);
-  
-    const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
-  
+function PastQuizzes({ attempts, isLoading, error }: PastQuizzesProps) {
     if (isLoading) {
       return (
         <div className="flex justify-center items-center h-40">
@@ -42,7 +27,7 @@ function PastQuizzes() {
     }
   
     if (error) {
-      return <div className="text-center text-destructive">Error loading past quizzes.</div>;
+      return <div className="text-center text-destructive">Error loading past quizzes. {error.message}</div>;
     }
   
     return (
@@ -66,7 +51,7 @@ function PastQuizzes() {
                   <TableRow key={attempt.id}>
                     <TableCell className="font-medium">{attempt.quizTopic}</TableCell>
                     <TableCell>
-                      <Badge variant={attempt.score >= 80 ? 'default' : attempt.score > 50 ? 'secondary' : 'destructive'}>
+                      <Badge variant={attempt.score >= 80 ? 'success' : attempt.score > 50 ? 'secondary' : 'destructive'}>
                         {attempt.score.toFixed(0)}%
                       </Badge>
                     </TableCell>
@@ -87,7 +72,13 @@ function PastQuizzes() {
     );
 }
 
-export default function StudentView() {
+interface StudentViewProps {
+    attempts: QuizAttempt[] | null;
+    isLoading: boolean;
+    error: FirestoreError | Error | null;
+}
+
+export default function StudentView({ attempts, isLoading, error }: StudentViewProps) {
     const { auth, user } = useFirebase();
     return (
         <div className="space-y-8">
@@ -96,7 +87,7 @@ export default function StudentView() {
                 <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
             </div>
             <QuizWhizApp />
-            <PastQuizzes />
+            <PastQuizzes attempts={attempts} isLoading={isLoading} error={error} />
         </div>
     );
 }
