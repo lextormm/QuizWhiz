@@ -13,6 +13,58 @@ interface QuizResultsProps {
   onRestart: () => void;
 }
 
+const InsightsSection = ({ title, items, icon: Icon, iconClass }: { title: string, items: string[], icon: React.ElementType, iconClass: string }) => {
+    if (items.length === 0) return null;
+  
+    return (
+      <div>
+        <h3 className="flex items-center text-lg font-semibold mb-2">
+          <Icon className={cn("h-5 w-5 mr-2", iconClass)} />
+          {title}
+        </h3>
+        <ul className="space-y-2 list-disc pl-5 text-muted-foreground">
+          {items.map((item, index) => (
+            <li key={index} dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>') }} />
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
+const ParsedInsights = ({ insights }: { insights: string }) => {
+    const lines = insights.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    let strengths: string[] = [];
+    let improvements: string[] = [];
+    let currentSection: 'strengths' | 'improvements' | null = null;
+  
+    lines.forEach(line => {
+      if (line.includes('Areas of Strong Understanding')) {
+        currentSection = 'strengths';
+        return;
+      }
+      if (line.includes('Areas for Improvement')) {
+        currentSection = 'improvements';
+        return;
+      }
+  
+      if (line.startsWith('*')) {
+        const item = line.substring(1).trim();
+        if (currentSection === 'strengths') {
+          strengths.push(item);
+        } else if (currentSection === 'improvements') {
+          improvements.push(item);
+        }
+      }
+    });
+  
+    return (
+      <div className="space-y-6">
+        <InsightsSection title="Areas of Strong Understanding" items={strengths} icon={CheckCircle2} iconClass="text-success" />
+        <InsightsSection title="Areas for Improvement" items={improvements} icon={XCircle} iconClass="text-destructive" />
+      </div>
+    );
+  }
+
 export default function QuizResults({
   quiz,
   userAnswers,
@@ -57,7 +109,11 @@ export default function QuizResults({
             <CardDescription>Here's an AI-powered breakdown of your performance.</CardDescription>
         </CardHeader>
         <CardContent>
-            <p className="whitespace-pre-wrap rounded-md bg-accent/50 p-4 text-accent-foreground">{insights}</p>
+            {insights ? (
+                <ParsedInsights insights={insights} />
+            ) : (
+                <p className="text-muted-foreground">Could not generate insights for this quiz.</p>
+            )}
         </CardContent>
       </Card>
 
