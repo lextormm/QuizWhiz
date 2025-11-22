@@ -40,9 +40,12 @@ export default function ProfessorDashboard() {
   const { data: userProfile } = useDoc<{ role: 'student' | 'professor' }>(userProfileRef);
 
   const attemptsQuery = useMemoFirebase(() => {
-      // Only run the query if we know the user is a professor
-      if (!firestore || !userProfile || userProfile.role !== 'professor') return null;
-      return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
+      // Only construct the query if we have the firestore instance AND the user is confirmed to be a professor.
+      if (firestore && userProfile?.role === 'professor') {
+        return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
+      }
+      // In all other cases (loading, not a professor, etc.), return null.
+      return null;
   }, [firestore, userProfile]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
@@ -98,7 +101,7 @@ export default function ProfessorDashboard() {
     }
   
     if (error) {
-      return <div className="text-center text-destructive">Error loading data: {error.message}</div>;
+      return <div className="text-center text-destructive p-4">Error loading data. You may not have permission to view this.</div>;
     }
 
     return (
