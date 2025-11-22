@@ -44,7 +44,7 @@ service cloud.firestore {
     // Students can list/query for their own attempts, professors for all.
     match /quizAttempts/{attemptId} {
       allow get: if isOwner(resource.data.studentId) || isProfessor();
-      allow list: if isProfessor() || request.query.where.studentId == request.auth.uid;
+      allow list: if isProfessor() || (isSignedIn() && request.query.where.studentId == request.auth.uid);
       allow create: if isOwner(request.resource.data.studentId);
       // Students cannot update or delete their past attempts.
       allow update, delete: if false;

@@ -26,12 +26,15 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
 }
 
 export default function ProfessorDashboard() {
-  const { auth, firestore } = useFirebase();
+  const { auth, firestore, user } = useFirebase();
+
+  // Only run the query if we have a firestore instance and the user is a professor
+  const isProfessor = user?.displayName === 'Professor';
 
   const attemptsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !isProfessor) return null;
     return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
-  }, [firestore]);
+  }, [firestore, isProfessor]);
 
   const { data: attempts, isLoading, error } = useCollection<QuizAttempt>(attemptsQuery);
   
