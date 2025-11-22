@@ -106,7 +106,7 @@ export default function ProfessorDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Quiz Attempts</CardTitle>
+          <CardTitle>Student Quiz Attempts</CardTitle>
           <CardDescription>A log of all quiz attempts by students.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -126,7 +126,7 @@ export default function ProfessorDashboard() {
                     <TableCell className="font-medium">{attempt.studentName}</TableCell>
                     <TableCell>{attempt.quizTopic}</TableCell>
                     <TableCell>
-                      <Badge variant={attempt.score > 80 ? 'default' : attempt.score > 50 ? 'secondary' : 'destructive'}>
+                      <Badge variant={attempt.score >= 80 ? 'default' : attempt.score > 50 ? 'secondary' : 'destructive'}>
                         {attempt.score.toFixed(0)}%
                       </Badge>
                     </TableCell>
