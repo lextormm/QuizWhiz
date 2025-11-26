@@ -33,14 +33,18 @@ function AnalyticsCard({ title, value, icon: Icon, subtext }: { title: string; v
 
 export default function ProfessorDashboard({ professor }: { professor: {id: string, name: string, role: 'professor'}}) {
   const { auth, firestore } = useFirebase();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   
   const attemptsQuery = useMemoFirebase(() => {
       // Stricter guard: only create the query if we are certain the user is a professor.
-      if (firestore && professor?.role === 'professor') {
+      // Only attach the class-wide attempts query when we know the caller is
+      // genuinely authenticated and the profile indicates a professor role.
+      // This avoids a short race condition where the client auth/context is
+      // partially available but the backend rejects the initial listener.
+      if (firestore && professor?.role === 'professor' && user && !isUserLoading) {
         return query(collection(firestore, "quizAttempts"), orderBy("submittedAt", "desc"));
       }
       return null;
@@ -97,20 +101,27 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
     setIsCreatingQuiz(false);
   }
 
-  const handleCreateQuiz = async (topic: string, numberOfQuestions: number) => {
+  const handleCreateQuiz = async (
+    topic: string,
+    numberOfQuestions: number,
+    durationMinutes?: number,
+    questionStyle?: string
+  ) => {
     if (!firestore || !user) return;
     
     setIsGenerating(true);
-    const result = await handleGenerateQuiz(topic, numberOfQuestions);
+    const result = await handleGenerateQuiz(topic, numberOfQuestions, questionStyle);
     setIsGenerating(false);
 
     if (result.success && result.data) {
-      const newQuiz: Omit<ProfessorQuiz, 'id' | 'createdAt'> & { createdAt: any } = {
+      const newQuiz: Omit<ProfessorQuiz, 'id' | 'createdAt'> & { createdAt: any, durationMinutes?: number, questionStyle?: string } = {
         topic,
         authorId: user.uid,
         authorName: professor.name,
         questions: result.data,
         createdAt: serverTimestamp(),
+        ...(durationMinutes ? { durationMinutes } : {}),
+        ...(questionStyle ? { questionStyle } : {}),
       };
       
       const quizzesCollection = collection(firestore, 'quizzes');

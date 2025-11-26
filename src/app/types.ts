@@ -12,6 +12,10 @@ export type ProfessorQuiz = {
   authorName: string;
   questions: QuizQuestion[];
   createdAt: Timestamp;
+  // Optional time limit (in minutes) set by the professor. If absent, the quiz has no time limit.
+  durationMinutes?: number;
+  // Optional short description of the kind/style of questions (e.g. 'numerical', 'theoretical', 'easy', 'tough')
+  questionStyle?: string;
 };
 
 export type Answer = {

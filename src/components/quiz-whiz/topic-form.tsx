@@ -9,17 +9,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen } from "lucide-react";
 
 interface TopicFormProps {
-  onStartQuiz: (topic: string, numberOfQuestions: number) => void;
+  onStartQuiz: (
+    topic: string,
+    numberOfQuestions: number,
+    durationMinutes?: number,
+    questionStyle?: string
+  ) => void;
 }
 
 export default function TopicForm({ onStartQuiz }: TopicFormProps) {
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState("5");
+  const [durationMinutes, setDurationMinutes] = useState("0");
+  const [questionStyle, setQuestionStyle] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
-      onStartQuiz(topic, parseInt(numQuestions));
+      const d = parseInt(durationMinutes);
+      onStartQuiz(
+        topic,
+        parseInt(numQuestions),
+        isNaN(d) || d <= 0 ? undefined : d,
+        questionStyle.trim() || undefined
+      );
     }
   };
 
@@ -58,6 +71,32 @@ export default function TopicForm({ onStartQuiz }: TopicFormProps) {
                 <SelectItem value="20">20 Questions</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="duration-minutes">Optional Timer</Label>
+            <Select value={durationMinutes} onValueChange={setDurationMinutes}>
+              <SelectTrigger id="duration-minutes" className="w-full">
+                <SelectValue placeholder="No timer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">No timer</SelectItem>
+                <SelectItem value="5">5 minutes</SelectItem>
+                <SelectItem value="10">10 minutes</SelectItem>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="20">20 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="question-style">Question style / guidance</Label>
+            <Input
+              id="question-style"
+              placeholder="e.g., numerical, theoretical, easy, tough, application-focused"
+              value={questionStyle}
+              onChange={(e) => setQuestionStyle(e.target.value)}
+              className="text-base"
+            />
           </div>
           <Button type="submit" className="w-full text-base font-bold" size="lg" disabled={!topic.trim()}>
             Generate Quiz

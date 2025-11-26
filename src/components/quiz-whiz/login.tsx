@@ -12,7 +12,9 @@ import { Loader2, GraduationCap, UserCircle } from 'lucide-react';
 
 export default function Login() {
   const [studentName, setStudentName] = useState('');
+  const [studentPassword, setStudentPassword] = useState('');
   const [professorName, setProfessorName] = useState('');
+  const [professorPassword, setProfessorPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('student');
   const { toast } = useToast();
@@ -77,6 +79,17 @@ export default function Login() {
                   onChange={(e) => setStudentName(e.target.value)}
                   disabled={isLoading}
                 />
+                <div>
+                  <Label htmlFor="student-password">Password</Label>
+                  <Input
+                    id="student-password"
+                    placeholder="Enter password"
+                    value={studentPassword}
+                    onChange={(e) => setStudentPassword(e.target.value)}
+                    disabled={isLoading}
+                    type="password"
+                  />
+                </div>
               </div>
             </CardContent>
             <CardFooter>
@@ -103,6 +116,17 @@ export default function Login() {
                   onChange={(e) => setProfessorName(e.target.value)}
                   disabled={isLoading}
                 />
+                <div>
+                  <Label htmlFor="professor-password">Password</Label>
+                  <Input
+                    id="professor-password"
+                    placeholder="Enter password"
+                    value={professorPassword}
+                    onChange={(e) => setProfessorPassword(e.target.value)}
+                    disabled={isLoading}
+                    type="password"
+                  />
+                </div>
               </div>
             </CardContent>
             <CardFooter>

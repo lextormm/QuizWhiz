@@ -23,6 +23,7 @@ export default function QuizWhizApp({ professorQuiz, onRestart }: QuizWhizAppPro
   const [topic, setTopic] = useState("");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [quizId, setQuizId] = useState<string | undefined>(undefined);
+  const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [insights, setInsights] = useState("");
@@ -39,6 +40,7 @@ export default function QuizWhizApp({ professorQuiz, onRestart }: QuizWhizAppPro
     setTopic(profQuiz.topic);
     setQuiz(profQuiz.questions);
     setQuizId(profQuiz.id);
+    setDurationMinutes(profQuiz.durationMinutes);
     setUserAnswers(new Array(profQuiz.questions.length).fill(""));
     setQuizState("taking");
   };
@@ -103,7 +105,9 @@ export default function QuizWhizApp({ professorQuiz, onRestart }: QuizWhizAppPro
   const renderContent = () => {
     switch (quizState) {
       case "taking":
-        return quiz && <QuizDisplay quiz={quiz} onFinish={finishQuiz} />;
+        return (
+          quiz && <QuizDisplay quiz={quiz} onFinish={finishQuiz} durationMinutes={durationMinutes} />
+        );
       case "submitting":
         return (
           <div className="flex flex-col items-center gap-4 text-center">

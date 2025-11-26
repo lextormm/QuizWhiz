@@ -4,6 +4,7 @@ import React, { DependencyList, createContext, useContext, ReactNode, useMemo, u
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -80,6 +81,46 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth,
       (firebaseUser) => { // Auth state determined
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
+
+        // Ensure a corresponding users/{uid} profile document exists for
+        // all sign-ins (this covers custom-token sign-ins that may skip
+        // the normal signIn() flow which creates the document). We merge
+        // data so we don't overwrite server-managed fields.
+        (async () => {
+          try {
+            if (!firebaseUser || !firestore) return;
+
+            const userRef = doc(firestore, 'users', firebaseUser.uid);
+
+            // Look up any existing profile
+            const existing = await getDoc(userRef);
+
+            // Try to read role from token claims if present (professor users
+            // created via custom tokens should include a role claim).
+            let roleFromToken: string | undefined;
+            try {
+              const idTokenResult = await firebaseUser.getIdTokenResult();
+              if (idTokenResult && idTokenResult.claims && typeof idTokenResult.claims.role === 'string') {
+                roleFromToken = idTokenResult.claims.role as string;
+              }
+            } catch (e) {
+              // If token retrieval fails, fall back to existing doc or default.
+            }
+
+            const desiredRole = roleFromToken || (existing.exists() ? existing.data().role : 'student');
+
+            // Create or merge the profile document so rules can successfully
+            // evaluate role-based checks immediately after sign-in.
+            await setDoc(userRef, {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Anonymous',
+              role: desiredRole,
+            }, { merge: true });
+          } catch (e) {
+            // non-fatal — just surface console info
+            console.warn('Failed creating/merging user profile on auth change', e);
+          }
+        })();
       },
       (error) => { // Auth listener error
         console.error("FirebaseProvider: onAuthStateChanged error:", error);

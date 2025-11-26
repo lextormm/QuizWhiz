@@ -52,7 +52,7 @@ export interface InternalQuery extends Query<DocumentData> {
  * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
  */
 export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+  memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & { __memo?: boolean }) | null | undefined,
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
@@ -60,19 +60,25 @@ export function useCollection<T = any>(
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
-
+  // Retry state for transient permission-denied errors. We will only surface
+  // a permanent permission error after exhausting retries.
+  const [permissionRetry, setPermissionRetry] = useState(0);
+  const maxPermissionRetries = 4; // conservative retry attempts
   useEffect(() => {
+    // If there's no query/ref, reset and bail early.
     if (!memoizedTargetRefOrQuery) {
       setData(null);
       setIsLoading(false);
       setError(null);
+      // reset retries when input changes to null
+      if (permissionRetry !== 0) setPermissionRetry(0);
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -80,33 +86,59 @@ export function useCollection<T = any>(
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
         }
+        // On successful data arrival, reset error & retry state
         setData(results);
         setError(null);
         setIsLoading(false);
+        if (permissionRetry !== 0) setPermissionRetry(0);
       },
-      (error: FirestoreError) => {
+      (err: FirestoreError) => {
         // This logic extracts the path from either a ref or a query
         const path: string =
           memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path,
-        })
+        });
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
+        // Treat permission-denied as potentially transient and retry a few times
+        const errAny = err as any | null;
+        const isPermissionDenied = errAny && errAny.code === 'permission-denied';
+
+        if (isPermissionDenied && permissionRetry < maxPermissionRetries) {
+          // schedule retry with exponential backoff
+          const delay = 200 * Math.pow(2, permissionRetry); // 200, 400, 800ms ...
+          // keep loading state while we retry
+          setIsLoading(true);
+          retryTimer = setTimeout(() => {
+            setPermissionRetry((p) => p + 1);
+          }, delay);
+          // Do not surface the error yet; allow the retry to attempt recovery.
+          return;
+        }
+
+        // Either it's not a permission-denied, or we've exhausted retries: surface it.
+        setError(contextualError);
+        setData(null);
+        setIsLoading(false);
 
         // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
-      }
+      },
     );
 
-    return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+    return () => {
+      try {
+        unsubscribe();
+      } catch (e) {
+        /* ignore unsubscribe errors */
+      }
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [memoizedTargetRefOrQuery, permissionRetry]); // Re-run if the target query/reference or retry state changes.
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
     throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
   }

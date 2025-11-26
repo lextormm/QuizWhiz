@@ -13,11 +13,21 @@ service cloud.firestore {
     }
 
     function isProfessor() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor';
+      // Allow either a user document with role 'professor' OR a custom/auth token
+      // that contains a role claim. This makes the check robust for both
+      // sign-in flows (app-created profile documents) and custom token users.
+      return isSignedIn() && (
+        request.auth.token.role == 'professor' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor'
+      );
     }
     
     function isStudent() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+      // Similar to isProfessor(), allow either an auth claim or a users doc role.
+      return isSignedIn() && (
+        request.auth.token.role == 'student' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'
+      );
     }
 
     // /users/{userId}
@@ -42,8 +52,21 @@ service cloud.firestore {
     // Professors can read all quiz attempts.
     match /quizAttempts/{attemptId} {
       allow get: if isOwner(resource.data.studentId) || isProfessor();
-      // Professors can list all attempts. Students can only list their own attempts.
-      allow list: if isProfessor() || (isStudent() && request.query.where[0][0] == 'studentId' && request.query.where[0][1] == '==' && request.query.where[0][2] == request.auth.uid);
+      // Professors can list all attempts.
+      // Students may only list their own attempts — and only when their
+      // query explicitly filters on studentId == request.auth.uid.
+      // We add safe guards (size checks) so a missing/empty request.query
+      // doesn't raise exceptions while rules evaluate.
+      allow list: if isProfessor() || (
+        isStudent() &&
+        // Make sure request.query and where clause exist and look like [field, op, value]
+        request.query != null &&
+        request.query.where.size() > 0 &&
+        request.query.where[0].size() == 3 &&
+        request.query.where[0][0] == 'studentId' &&
+        request.query.where[0][1] == '==' &&
+        request.query.where[0][2] == request.auth.uid
+      );
       allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
       // Nobody can update or delete past attempts.
       allow update, delete: if false;

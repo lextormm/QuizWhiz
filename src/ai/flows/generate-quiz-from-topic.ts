@@ -17,6 +17,11 @@ const GenerateQuizInputSchema = z.object({
     .number()
     .default(5)
     .describe('The number of questions to generate for the quiz.'),
+  // Optional description of the kind/style of question the professor wants
+  // e.g. 'numerical', 'theoretical', 'easy', 'tough', or more detailed
+  // guidance. This is optional and will be included in the prompt when
+  // present.
+  questionStyle: z.string().optional().describe('Optional question style or guidance for the generated questions.'),
 });
 export type GenerateQuizInput = z.infer<typeof GenerateQuizInputSchema>;
 
@@ -39,7 +44,11 @@ const quizQuestionPrompt = ai.definePrompt({
   name: 'quizQuestionPrompt',
   input: {schema: GenerateQuizInputSchema},
   output: {schema: QuizQuestionSchema},
-  prompt: `You are a quiz generator. Generate a single multiple-choice question about the topic: {{{topic}}}.  The question should have multiple choice options.
+    prompt: `You are a quiz generator. Generate a single multiple-choice question about the topic: {{{topic}}}.  The question should have multiple choice options.
+
+      {{#if questionStyle}}
+      Guidance for question style: {{{questionStyle}}}
+      {{/if}}
 
       {{zodFormatOutput}}`,
 });
