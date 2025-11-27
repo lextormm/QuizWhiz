@@ -15,6 +15,7 @@ export default function Login() {
   const [studentPassword, setStudentPassword] = useState('');
   const [professorName, setProfessorName] = useState('');
   const [professorPassword, setProfessorPassword] = useState('');
+  const [professorEmail, setProfessorEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('student');
   const { toast } = useToast();
@@ -22,23 +23,42 @@ export default function Login() {
   const [showProfessorAbout, setShowProfessorAbout] = useState(false);
 
   const handleLogin = async (role: 'student' | 'professor') => {
-    const name = role === 'student' ? studentName : professorName;
-    if (!name.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please enter your name.',
-      });
-      return;
+    if (role === 'professor') {
+      // Hardcoded credentials
+      const validName = 'Nishant Gupta';
+      const validEmail = 'nishant.gupta@lnmiit.ac.in';
+      const validPassword = '12345678';
+      if (
+        professorName !== validName ||
+        professorEmail !== validEmail ||
+        professorPassword !== validPassword
+      ) {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid Credentials',
+          description: 'Please enter valid professor credentials.',
+        });
+        return;
+      }
+    } else {
+      const name = studentName;
+      if (!name.trim()) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Please enter your name.',
+        });
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      await signIn(name, role);
+      await signIn(role === 'student' ? studentName : professorName, role);
       // The onAuthStateChanged listener in FirebaseProvider will handle the redirect.
       toast({
         title: 'Success',
-        description: `Welcome, ${name}!`,
+        description: `Welcome, ${role === 'student' ? studentName : professorName}!`,
       });
     } catch (error) {
       console.error(error);
@@ -108,6 +128,16 @@ export default function Login() {
                   onChange={(e) => setStudentName(e.target.value)}
                   disabled={isLoading}
                 />
+                {/* Email section added below */}
+                <div>
+                  <Label htmlFor="student-email">Email</Label>
+                  <Input
+                    id="student-email"
+                    placeholder="Enter your email"
+                    disabled={isLoading}
+                    type="email"
+                  />
+                </div>
                 <div>
                   <Label htmlFor="student-password">Password</Label>
                   <Input
@@ -172,6 +202,18 @@ export default function Login() {
                   onChange={(e) => setProfessorName(e.target.value)}
                   disabled={isLoading}
                 />
+                {/* Email section added below */}
+                <div>
+                  <Label htmlFor="professor-email">Email</Label>
+                  <Input
+                    id="professor-email"
+                    placeholder="Enter your email"
+                    value={professorEmail}
+                    onChange={(e) => setProfessorEmail(e.target.value)}
+                    disabled={isLoading}
+                    type="email"
+                  />
+                </div>
                 <div>
                   <Label htmlFor="professor-password">Password</Label>
                   <Input
