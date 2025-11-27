@@ -390,7 +390,10 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
     <div className="space-y-8">
        <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold">Professor Dashboard</h1>
-            <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+            <div className="flex items-center gap-3">
+              <a href="/about-professor" className="text-sm text-black hover:underline mr-2">About</a>
+              <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+            </div>
         </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
