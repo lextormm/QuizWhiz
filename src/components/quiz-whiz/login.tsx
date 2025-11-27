@@ -18,6 +18,8 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('student');
   const { toast } = useToast();
+  const [showStudentAbout, setShowStudentAbout] = useState(false);
+  const [showProfessorAbout, setShowProfessorAbout] = useState(false);
 
   const handleLogin = async (role: 'student' | 'professor') => {
     const name = role === 'student' ? studentName : professorName;
@@ -64,6 +66,33 @@ export default function Login() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="student">
+          {/* Small interactive About / Intro area for students */}
+          <Card className="mb-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Welcome to QuizWhiz — Students</CardTitle>
+                  <CardDescription>Quick practice quizzes tailored by professors or generated on-demand to help you learn fast.</CardDescription>
+                </div>
+                <div>
+                  <Button size="sm" variant="ghost" onClick={() => setShowStudentAbout(s => !s)}>
+                    {showStudentAbout ? 'Less' : 'Learn more'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            {showStudentAbout && (
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>• Take quizzes created by your professor or try AI-generated topic quizzes.</p>
+                <p>• Real-time scoring and actionable feedback after submission.</p>
+                <p>• Use the optional timer when a professor sets a time limit — quizzes auto-submit when time runs out.</p>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={() => toast({ title: 'Tip', description: 'Best used with a stable internet connection for real-time scoring.' })}>Tip</Button>
+                  <Button size="sm" onClick={() => setShowStudentAbout(false)}>Got it</Button>
+                </div>
+              </CardContent>
+            )}
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Student Login</CardTitle>
@@ -101,6 +130,33 @@ export default function Login() {
           </Card>
         </TabsContent>
         <TabsContent value="professor">
+          {/* Small interactive About / Intro area for professors */}
+          <Card className="mb-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Welcome to QuizWhiz — Professors</CardTitle>
+                  <CardDescription>Create classroom quizzes or generate AI-driven quizzes and review them before publishing.</CardDescription>
+                </div>
+                <div>
+                  <Button size="sm" variant="ghost" onClick={() => setShowProfessorAbout(s => !s)}>
+                    {showProfessorAbout ? 'Less' : 'Learn more'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            {showProfessorAbout && (
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>• Generate quizzes from a topic, add a time limit, and choose question style.</p>
+                <p>• Review AI-generated questions, edit them inline and publish only after approval.</p>
+                <p>• View student attempts and get analytics from the Professor Dashboard.</p>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={() => toast({ title: 'Workflow', description: 'Generate → Review → Publish — students can then take the quiz.' })}>Workflow</Button>
+                  <Button size="sm" onClick={() => setShowProfessorAbout(false)}>Got it</Button>
+                </div>
+              </CardContent>
+            )}
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Professor Login</CardTitle>

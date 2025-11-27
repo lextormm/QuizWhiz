@@ -1,8 +1,10 @@
 'use client';
 
 import { useFirebase, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import type { QuizAttempt, ProfessorQuiz } from "@/app/types";
+import type { QuizAttempt, ProfessorQuiz, QuizQuestion } from "@/app/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,12 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
   const { toast } = useToast();
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [previewQuiz, setPreviewQuiz] = useState<{
+    topic: string;
+    questions: QuizQuestion[];
+    durationMinutes?: number;
+    questionStyle?: string;
+  } | null>(null);
   
   const attemptsQuery = useMemoFirebase(() => {
       // Stricter guard: only create the query if we are certain the user is a professor.
@@ -114,37 +122,69 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
     setIsGenerating(false);
 
     if (result.success && result.data) {
-      const newQuiz: Omit<ProfessorQuiz, 'id' | 'createdAt'> & { createdAt: any, durationMinutes?: number, questionStyle?: string } = {
-        topic,
-        authorId: user.uid,
-        authorName: professor.name,
-        questions: result.data,
-        createdAt: serverTimestamp(),
-        ...(durationMinutes ? { durationMinutes } : {}),
-        ...(questionStyle ? { questionStyle } : {}),
-      };
-      
-      const quizzesCollection = collection(firestore, 'quizzes');
-      addDoc(quizzesCollection, newQuiz).catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
-            path: quizzesCollection.path,
-            operation: 'create',
-            requestResourceData: newQuiz,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-      });
-      
+      // Store the generated questions for professor review. The professor
+      // must approve before we persist the quiz so they can inspect/edit.
+      setPreviewQuiz({ topic, questions: result.data, durationMinutes, questionStyle });
       toast({
-        title: "Quiz Created!",
-        description: `Your quiz on "${topic}" is now available for students.`,
+        title: "Preview ready",
+        description: `Review the generated questions below, then approve to publish.`,
       });
-      setIsCreatingQuiz(false);
+      // leave isCreatingQuiz true so the form/preview remain visible
     } else {
       toast({
         variant: "destructive",
         title: "Error",
         description: result.error || "Failed to generate quiz.",
       });
+    }
+  };
+
+  const handleApproveAndPublish = async () => {
+    if (!firestore || !user || !previewQuiz) return;
+    const { topic, questions, durationMinutes, questionStyle } = previewQuiz;
+    const newQuiz: Omit<ProfessorQuiz, 'id' | 'createdAt'> & { createdAt: any, durationMinutes?: number, questionStyle?: string } = {
+      topic,
+      authorId: user.uid,
+      authorName: professor.name,
+      questions,
+      createdAt: serverTimestamp(),
+      ...(durationMinutes ? { durationMinutes } : {}),
+      ...(questionStyle ? { questionStyle } : {}),
+    };
+
+    const quizzesCollection = collection(firestore, 'quizzes');
+    addDoc(quizzesCollection, newQuiz).catch(async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: quizzesCollection.path,
+        operation: 'create',
+        requestResourceData: newQuiz,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    });
+
+    toast({
+      title: 'Quiz Published',
+      description: `Your quiz on "${topic}" is now available for students.`,
+    });
+    setPreviewQuiz(null);
+    setIsCreatingQuiz(false);
+  };
+
+  const handleRejectPreview = () => {
+    // Simply clear preview so professor can edit/regenerate
+    setPreviewQuiz(null);
+  };
+
+  const handleRegeneratePreview = async () => {
+    if (!previewQuiz) return;
+    setIsGenerating(true);
+    const result = await handleGenerateQuiz(previewQuiz.topic, previewQuiz.questions.length, previewQuiz.questionStyle);
+    setIsGenerating(false);
+    if (result.success && result.data) {
+      setPreviewQuiz({ ...previewQuiz, questions: result.data });
+      toast({ title: 'Regenerated preview', description: 'The questions were regenerated for your review.' });
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to regenerate questions.' });
     }
   };
 
@@ -175,6 +215,133 @@ export default function ProfessorDashboard({ professor }: { professor: {id: stri
     }
 
     if (isCreatingQuiz) {
+        // If we have a generated preview, show it for review/approval.
+        if (previewQuiz) {
+          return (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Review Generated Questions</CardTitle>
+                      <CardDescription>Inspect each generated question and approve to publish the quiz for students.</CardDescription>
+                    </div>
+                    <div className="space-x-2">
+                      <Button onClick={handleRegeneratePreview} variant="ghost">Regenerate</Button>
+                      <Button onClick={handleRejectPreview} variant="outline">Back to Edit</Button>
+                      <Button onClick={handleApproveAndPublish} variant="default">Approve & Publish</Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground">Topic: <strong>{previewQuiz.topic}</strong></div>
+                  {previewQuiz.durationMinutes && (
+                    <div className="text-sm text-muted-foreground">Duration: <strong>{previewQuiz.durationMinutes} minutes</strong></div>
+                  )}
+                  {previewQuiz.questionStyle && (
+                    <div className="text-sm text-muted-foreground">Style: <strong>{previewQuiz.questionStyle}</strong></div>
+                  )}
+
+                  <div className="space-y-4">
+                    {previewQuiz.questions.map((q, idx) => (
+                      <div key={idx} className="p-4 border rounded-lg">
+                        <div className="mb-2">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="font-semibold">{idx + 1}.</div>
+                            <div className="flex-1">
+                              <Textarea
+                                value={q.question}
+                                onChange={(e) => {
+                                  const newQuestions = previewQuiz.questions.slice();
+                                  newQuestions[idx] = { ...newQuestions[idx], question: e.target.value };
+                                  setPreviewQuiz({ ...previewQuiz, questions: newQuestions });
+                                }}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {q.options.map((opt, oIdx) => (
+                            <div key={oIdx} className={`p-2 rounded flex items-center gap-3 ${opt === q.correctAnswer ? 'bg-green-50 border border-green-200' : 'border bg-white'}`}>
+                              <div className="w-6 text-sm font-medium">{String.fromCharCode(65 + oIdx)}.</div>
+                              <Input
+                                value={opt}
+                                onChange={(e) => {
+                                  const newQuestions = previewQuiz.questions.slice();
+                                  const newOpts = newQuestions[idx].options.slice();
+                                  newOpts[oIdx] = e.target.value;
+                                  newQuestions[idx] = { ...newQuestions[idx], options: newOpts };
+                                  setPreviewQuiz({ ...previewQuiz, questions: newQuestions });
+                                }}
+                                className="flex-1"
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={opt === q.correctAnswer ? 'default' : 'outline'}
+                                  onClick={() => {
+                                    const newQuestions = previewQuiz.questions.slice();
+                                    newQuestions[idx] = { ...newQuestions[idx], correctAnswer: opt };
+                                    setPreviewQuiz({ ...previewQuiz, questions: newQuestions });
+                                  }}
+                                >
+                                  {opt === q.correctAnswer ? 'Correct' : 'Mark Correct'}
+                                </Button>
+                                {q.options.length > 2 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const newQuestions = previewQuiz.questions.slice();
+                                      const newOpts = newQuestions[idx].options.slice();
+                                      newOpts.splice(oIdx, 1);
+                                      // ensure correctAnswer still valid
+                                      let newCorrect = newQuestions[idx].correctAnswer;
+                                      if (!newOpts.includes(newCorrect)) newCorrect = newOpts[0];
+                                      newQuestions[idx] = { ...newQuestions[idx], options: newOpts, correctAnswer: newCorrect };
+                                      setPreviewQuiz({ ...previewQuiz, questions: newQuestions });
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="flex gap-2 mt-1">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const newQuestions = previewQuiz.questions.slice();
+                                const opts = newQuestions[idx].options.slice();
+                                opts.push('New option');
+                                newQuestions[idx] = { ...newQuestions[idx], options: opts };
+                                setPreviewQuiz({ ...previewQuiz, questions: newQuestions });
+                              }}
+                            >
+                              Add Option
+                            </Button>
+                            <div className="text-sm text-muted-foreground">Mark the correct option for each question.</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex gap-2">
+                <Button onClick={handleApproveAndPublish} className="flex-1">Approve & Publish</Button>
+                <Button variant="outline" onClick={handleRegeneratePreview}>Regenerate</Button>
+                <Button variant="ghost" onClick={handleCancelCreateQuiz}>Cancel</Button>
+              </div>
+            </div>
+          )
+        }
+
         return (
             <div>
                 <TopicForm onStartQuiz={handleCreateQuiz} />
